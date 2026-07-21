@@ -1,0 +1,48 @@
+{
+  "fixture_id": "orbital-relay-recovery",
+  "fixture_version": "2026.07.1",
+  "headline": "Recovery route held inside the offline safety envelope",
+  "summary": "Switchyard replayed a captured relay incident, admitted only the read-only fixture capability, and produced a receipt without storing the operator command or result body.",
+  "signals": [
+    {
+      "label": "Relay heartbeat",
+      "value": "17 s jitter in captured telemetry",
+      "state": "watch"
+    },
+    {
+      "label": "Write authority",
+      "value": "No write capability present",
+      "state": "held"
+    },
+    {
+      "label": "Evidence bundle",
+      "value": "3 embedded records matched",
+      "state": "nominal"
+    }
+  ],
+  "recommended_sequence": [
+    "Hold outbound commands at the policy gate.",
+    "Compare heartbeat drift with the captured maintenance window.",
+    "Prepare a human-reviewed recovery proposal outside this demo."
+  ],
+  "sources": [
+    {
+      "source_id": "telemetry-window-07",
+      "label": "Captured telemetry window 07",
+      "captured_at": "2026-07-21T09:30:00Z",
+      "content": "relay-7 heartbeat jitter 17 seconds; command channel not observed; capture is synthetic"
+    },
+    {
+      "source_id": "maintenance-ledger-04",
+      "label": "Synthetic maintenance ledger 04",
+      "captured_at": "2026-07-21T09:31:00Z",
+      "content": "antenna calibration window overlaps relay-7 heartbeat drift; no live maintenance system contacted"
+    },
+    {
+      "source_id": "policy-envelope-01",
+      "label": "Offline policy envelope 01",
+      "captured_at": "2026-07-21T09:32:00Z",
+      "content": "fixture.read allowed; writes denied; control.stop always admitted; control.reset explicit"
+    }
+  ]
+}
