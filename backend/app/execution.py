@@ -6,6 +6,8 @@ import json
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from enum import Enum
+from math import isfinite
+from time import monotonic
 from typing import Any, Literal
 from uuid import uuid4
 
@@ -101,18 +103,35 @@ class SyntheticExecutor:
         stop: StopController,
         fixtures: FixtureLibrary | None = None,
         checkpoint_hook: Callable[[], Awaitable[None]] | None = None,
+        *,
+        inspection_seconds: float = 4.0,
     ) -> None:
+        if not isfinite(inspection_seconds) or inspection_seconds < 0:
+            raise ValueError("inspection_seconds must be finite and non-negative")
         self._stop = stop
         self._fixtures = fixtures or FixtureLibrary()
         self._checkpoint_hook = checkpoint_hook
+        self._inspection_seconds = inspection_seconds
 
     async def run(self, fixture_id: str, token: StopToken):
         self._stop.checkpoint(token)
         await asyncio.sleep(0)
+        self._stop.checkpoint(token)
         if self._checkpoint_hook is not None:
             await self._checkpoint_hook()
+            self._stop.checkpoint(token)
+
+        # Deliberate synthetic pacing gives the operator time to exercise stop.
+        # It represents no provider work or per-stage progress.
+        deadline = monotonic() + self._inspection_seconds
+        while (remaining := deadline - monotonic()) > 0:
+            self._stop.checkpoint(token)
+            await asyncio.sleep(min(remaining, 0.1))
+            self._stop.checkpoint(token)
+
         self._stop.checkpoint(token)
         result, sources = self._fixtures.load(fixture_id)
+        self._stop.checkpoint(token)
         await asyncio.sleep(0)
         self._stop.checkpoint(token)
         return result, sources

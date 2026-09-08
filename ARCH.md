@@ -15,6 +15,8 @@ Switchyard is deliberately smaller than its interface suggests. The console visu
 
 `POST /api/actions` validates a strict Pydantic request, fingerprints it, and creates a deterministic plan. The gateway evaluates every planned action against the policy allowlist and current stop state. An admitted executor receives a generation token and must checkpoint before and after meaningful work. Completed, blocked, stopped, and failed attempts all produce a receipt.
 
+The packaged fixture has a deliberate four-second inspection window before it is loaded. This is synthetic pacing so an operator can stop an in-flight replay; it is not external execution, provider latency, or reported stage progress. A monotonic deadline bounds the window, with sleeps requested for at most 100 ms and token checkpoints before and after each await. Event-loop scheduling can extend a sleep. A stop, including a stop followed immediately by reset, invalidates the in-flight token and prevents fixture loading and result release. The executor checks again around loading and before returning the unchanged deterministic fixture and source fingerprints. Tests can explicitly set a zero-second window without changing the production default.
+
 Stop enablement is always admissible. Reset is a distinct action with a literal acknowledgement. If receipt persistence fails during reset, the gateway re-latches stop so loss of auditability fails safe.
 
 ## Components
@@ -25,7 +27,7 @@ Stop enablement is always admissible. Reset is a distinct action with a literal 
 | `ActionGateway` | Ordering plan → gate → checkpoints → receipt | Provider-specific logic |
 | `PolicyEngine` | Exact allowlist checks | Duplicating stop state |
 | `StopController` | State, generation, token validation | Persistence or policy |
-| `SyntheticExecutor` | Load packaged fixture between checkpoints | Network, filesystem writes, subprocesses |
+| `SyntheticExecutor` | Hold an interruptible inspection window, then load the packaged fixture between checkpoints | Network, filesystem writes, subprocesses |
 | `ReceiptStore` | Persist reduced receipt schema | Commands, answers, excerpts, exception text |
 | React console | Visualize server decisions and send controls | Predicting policy locally |
 

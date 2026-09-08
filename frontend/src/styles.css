@@ -16,7 +16,7 @@
 }
 body {
   margin: 0;
-  min-width: 360px;
+  min-width: 320px;
 }
 button,
 input,
@@ -187,6 +187,7 @@ code,
   border-bottom: 1px solid var(--line);
 }
 .workspace-nav > button {
+  white-space: nowrap;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -251,6 +252,28 @@ h1 > span {
 }
 .page-context {
   padding-bottom: 5px;
+}
+.incident-reading {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 17px;
+}
+.incident-reading strong {
+  font-size: 64px;
+  line-height: 0.9;
+  font-weight: 400;
+  letter-spacing: -4px;
+}
+.incident-reading strong span {
+  font-size: 30px;
+  letter-spacing: -1px;
+  margin-left: 4px;
+}
+.incident-reading > span {
+  font: 9px/1.8 var(--mono);
+  letter-spacing: 0.6px;
+  color: var(--muted);
 }
 .page-context p {
   font-size: 16px;
@@ -328,6 +351,47 @@ h1 > span {
   margin-top: 24px;
   font-size: 15px;
 }
+.inspection-hint {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+  font-size: 11px;
+  line-height: 1.7;
+  color: var(--muted);
+  margin-top: 14px;
+}
+.inspection-hint strong {
+  font-weight: 500;
+  color: var(--ink);
+}
+.pending-mark {
+  width: 7px;
+  height: 7px;
+  background: var(--accent);
+  margin-right: 3px;
+  animation: pending-pulse 1s ease-in-out infinite alternate;
+}
+@keyframes pending-pulse {
+  to {
+    opacity: 0.3;
+  }
+}
+.result-jump {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  text-decoration: none;
+  font-size: 12px;
+  padding: 14px 0 0;
+  color: var(--muted);
+}
+.result-jump:hover {
+  color: var(--accent);
+}
+.result-jump span {
+  color: var(--accent);
+}
 .instruction-details {
   margin-top: 17px;
 }
@@ -377,6 +441,15 @@ textarea {
   font-size: 10px;
   line-height: 1.6;
   color: var(--muted);
+}
+.form-validation {
+  color: #ad482a;
+  font-size: 11px;
+  line-height: 1.7;
+  margin-top: 12px;
+}
+.dispatch-feedback:empty {
+  display: none;
 }
 .route-surface {
   border-left: 1px solid var(--line);
@@ -786,6 +859,10 @@ textarea {
   margin-top: 18px;
 }
 .result-badge {
+  cursor: pointer;
+  background: none;
+  border: 0;
+  padding: 4px 0;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -793,6 +870,71 @@ textarea {
   white-space: nowrap;
   color: #598148;
   align-self: flex-start;
+}
+.result-badge:hover {
+  color: var(--ink);
+}
+.result-panel:focus,
+.held-result:focus {
+  outline: none;
+}
+.held-result {
+  margin-top: 40px;
+  padding: 28px 0;
+  border-block: 1px solid #b86347;
+}
+.held-result-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 30px;
+}
+.held-result-heading > svg {
+  color: var(--accent);
+  flex-shrink: 0;
+}
+.held-result .overline {
+  color: #a3472a;
+}
+.held-result h2 {
+  font-size: 35px;
+  line-height: 1.1;
+  letter-spacing: -1px;
+  font-weight: 450;
+}
+.held-result-heading p:not(.overline) {
+  max-width: 660px;
+  margin-top: 17px;
+  font-size: 14px;
+  line-height: 1.8;
+  color: var(--muted);
+}
+.held-facts {
+  display: grid;
+  grid-template-columns: 1fr 0.8fr 0.8fr 1.4fr;
+  gap: 20px;
+  margin: 26px 0;
+  padding: 20px 0;
+  border-block: 1px solid var(--line);
+}
+.held-facts dt {
+  font-size: 10px;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+.held-facts dd {
+  margin: 0;
+  font: 12px/1.8 var(--mono);
+  overflow-wrap: anywhere;
+}
+.page-footer > a {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  text-decoration: none;
+}
+.page-footer > a:hover {
+  color: var(--accent);
 }
 .signal-grid {
   display: grid;
@@ -1267,8 +1409,12 @@ textarea {
   }
   .instruction-details {
     grid-column: 2;
-    grid-row: 3;
+    grid-row: 4;
     margin-top: 15px;
+  }
+  .dispatch-feedback {
+    grid-column: 2;
+    grid-row: 3;
   }
   .route-surface {
     border-left: 0;
@@ -1303,10 +1449,18 @@ textarea {
   }
 }
 @media (max-width: 560px) {
-  .node-title { font-size: 24px; }
-  .node-number { font-size: 20px; }
-  .node-sub { display: none; }
-  .stop-track text { font-size: 18px; }
+  .node-title {
+    font-size: 24px;
+  }
+  .node-number {
+    font-size: 20px;
+  }
+  .node-sub {
+    display: none;
+  }
+  .stop-track text {
+    font-size: 18px;
+  }
   .app-shell {
     padding-inline: 20px;
   }
@@ -1340,6 +1494,7 @@ textarea {
   }
   .stop-control {
     margin-left: auto;
+    min-height: 44px;
     padding: 10px;
     font-size: 10px;
     gap: 6px;
@@ -1349,7 +1504,8 @@ textarea {
   }
   .workspace-nav {
     min-height: 58px;
-    gap: 23px;
+    gap: 14px;
+    justify-content: space-between;
   }
   .workspace-nav > button {
     font-size: 11px;
@@ -1359,8 +1515,7 @@ textarea {
     display: none;
   }
   .workspace-nav > a {
-    font-size: 10px;
-    gap: 5px;
+    display: none;
   }
   .workspace-nav > a svg {
     width: 12px;
@@ -1385,6 +1540,46 @@ textarea {
   .page-context {
     margin-top: 22px;
     padding: 0;
+  }
+  .incident-reading {
+    margin-bottom: 14px;
+    gap: 14px;
+  }
+  .incident-reading strong {
+    font-size: 44px;
+    letter-spacing: -2px;
+  }
+  .incident-reading strong span {
+    font-size: 24px;
+  }
+  .incident-reading > span {
+    font-size: 8px;
+  }
+  .held-result {
+    margin-top: 30px;
+    padding-block: 24px;
+  }
+  .held-result-heading {
+    gap: 15px;
+  }
+  .held-result-heading > svg {
+    width: 25px;
+  }
+  .held-result h2 {
+    font-size: 28px;
+  }
+  .held-result-heading p:not(.overline) {
+    font-size: 13px;
+  }
+  .held-facts {
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+  .held-facts dd {
+    font-size: 11px;
+  }
+  .page-footer > a {
+    margin-left: auto;
   }
   .page-context p {
     font-size: 14px;

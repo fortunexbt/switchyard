@@ -137,6 +137,7 @@ function App() {
   const [view, setView] = useState<View>("dispatch");
   const [command, setCommand] = useState(DEFAULT_COMMAND);
   const [confirmReset, setConfirmReset] = useState(false);
+  const [ledgerQuery, setLedgerQuery] = useState("");
   const resetDialog = useRef<HTMLDialogElement>(null);
   const connected = connection === "connected";
   const stopped = system?.stop.enabled ?? false;
@@ -153,7 +154,16 @@ function App() {
   }, [confirmReset]);
 
   function navigate(next: View) {
+    setLedgerQuery("");
     setView(next);
+    clearResultAnchor();
+    window.scrollTo({ top: 0, behavior: "instant" });
+  }
+
+  function inspectReceipt(receipt: Receipt) {
+    setLedgerQuery(receipt.receipt_id);
+    setView("receipts");
+    clearResultAnchor();
     window.scrollTo({ top: 0, behavior: "instant" });
   }
 
@@ -177,9 +187,9 @@ function App() {
           <span>Switchyard</span>
         </button>
         <span className="masthead-caption">
-          An execution boundary
+          Offline execution lab
           <br />
-          you can inspect.
+          Policy. Stop. Record.
         </span>
         <div className="runtime-status">
           <span className={`connection ${connection}`}>
@@ -241,7 +251,7 @@ function App() {
           <div>
             <p className="overline">
               {view === "dispatch"
-                ? "THE SAFETY DRILL / 2026.07.1"
+                ? "INSPECTION DRILL / 2026.07.1"
                 : view === "receipts"
                   ? "THE RECORD"
                   : "THE CONTRACT"}
@@ -269,9 +279,21 @@ function App() {
             </h1>
           </div>
           <div className="page-context">
+            {view === "dispatch" && (
+              <div className="incident-reading">
+                <strong>
+                  17<span>s</span>
+                </strong>
+                <span>
+                  HEARTBEAT JITTER
+                  <br />
+                  RELAY 07 · CAPTURED
+                </span>
+              </div>
+            )}
             <p>
               {view === "dispatch"
-                ? "Replay a captured incident through a real policy gate. Inspect the result and the receipt it leaves behind."
+                ? "A drifting relay. An overlapping maintenance window. Investigate the captured evidence inside a read-only boundary."
                 : view === "receipts"
                   ? "A local record of replays, stops, and resets. Expand a row to inspect the full receipt."
                   : "One fixed incident. Three allowed capabilities. Everything else is denied."}
@@ -331,10 +353,11 @@ function App() {
                 <p className="section-label">
                   <span>01</span> Dispatch
                 </p>
-                <h2>One read-only replay.</h2>
+                <h2>Replay it. Try stopping it.</h2>
                 <p className="dispatch-description">
-                  This drill reads three embedded records. It has no authority
-                  to contact or change a live system.
+                  The replay is deliberately paced so you can interrupt it. A
+                  completed run releases evidence. A stopped run releases only a
+                  receipt.
                 </p>
                 <button
                   className="primary-button run-button"
@@ -342,12 +365,34 @@ function App() {
                   disabled={!canDispatch}
                 >
                   {busy
-                    ? "Waiting for backend…"
+                    ? "Replay pending…"
                     : stopped && connected
                       ? "Execution stopped"
                       : "Replay incident"}
                   <Icon name="arrow" size={22} />
                 </button>
+                <div className="dispatch-feedback">
+                  {command.trim().length < 3 && (
+                    <p className="form-validation" role="alert">
+                      The receipt annotation needs at least 3 characters.
+                    </p>
+                  )}
+                  {busy && (
+                    <p className="inspection-hint">
+                      <span className="pending-mark" aria-hidden="true" />
+                      Use <strong>Stop execution</strong> before the replay
+                      finishes.
+                    </p>
+                  )}
+                  {outcome && !busy && (
+                    <a className="result-jump" href="#run-result">
+                      {outcome.result
+                        ? "Inspect the captured result"
+                        : "Inspect the held run"}
+                      <span aria-hidden="true">↓</span>
+                    </a>
+                  )}
+                </div>
                 <details className="instruction-details">
                   <summary>
                     Receipt annotation<span>+</span>
@@ -399,7 +444,7 @@ function App() {
                 <div className="route-reading">
                   <span>
                     {busy
-                      ? "Waiting for a policy decision and receipt."
+                      ? "Paced replay requested. Waiting for the backend receipt."
                       : outcome
                         ? outcome.receipt.status === "completed"
                           ? "Last replay completed. Its receipt is recorded below."
@@ -426,7 +471,17 @@ function App() {
               {notice}
             </p>
             {outcome?.result && (
-              <ResultPanel outcome={outcome} result={outcome.result} />
+              <ResultPanel
+                outcome={outcome}
+                result={outcome.result}
+                onInspect={() => inspectReceipt(outcome.receipt)}
+              />
+            )}
+            {outcome && !outcome.result && (
+              <HeldResult
+                outcome={outcome}
+                onInspect={() => inspectReceipt(outcome.receipt)}
+              />
             )}
             <div className="section-heading recent-heading">
               <div>
@@ -455,6 +510,8 @@ function App() {
         )}
         {view === "receipts" && (
           <Ledger
+            key={ledgerQuery}
+            initialQuery={ledgerQuery}
             receipts={receipts}
             connected={connected}
             refresh={plane.refresh}
@@ -467,7 +524,13 @@ function App() {
         <footer className="page-footer">
           <span>SWITCHYARD</span>
           <p>Commands are temporary. The record is metadata.</p>
-          <span>LOCAL / OFFLINE PROOF</span>
+          <a
+            href="https://github.com/fortunexbt/switchyard"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Source <Icon name="external" size={12} />
+          </a>
         </footer>
       </main>
       <dialog
@@ -679,22 +742,29 @@ function PolicyInspector({
 function ResultPanel({
   outcome,
   result,
+  onInspect,
 }: {
   outcome: ActionResponse;
   result: DemoResult;
+  onInspect: () => void;
 }) {
   return (
-    <section className="result-panel" aria-labelledby="result-title">
+    <section
+      className="result-panel"
+      id="run-result"
+      tabIndex={-1}
+      aria-labelledby="result-title"
+    >
       <div className="result-heading">
         <div>
           <p className="overline">CAPTURED OUTPUT · {result.fixture_version}</p>
           <h2 id="result-title">Recovery drill complete</h2>
           <p>{result.summary}</p>
         </div>
-        <span className="result-badge">
+        <button type="button" className="result-badge" onClick={onInspect}>
           <Icon name="check" size={15} />
-          Receipt recorded
-        </span>
+          Inspect receipt <Icon name="arrow" size={15} />
+        </button>
       </div>
       <div className="signal-grid">
         {result.signals.map((signal) => (
@@ -757,16 +827,77 @@ function ResultPanel({
   );
 }
 
+function HeldResult({
+  outcome,
+  onInspect,
+}: {
+  outcome: ActionResponse;
+  onInspect: () => void;
+}) {
+  const interrupted = outcome.policy.code === "denied.stop-during-execution";
+  return (
+    <section
+      className="held-result"
+      id="run-result"
+      tabIndex={-1}
+      aria-labelledby="held-title"
+    >
+      <div className="held-result-heading">
+        <div>
+          <p className="overline">
+            {interrupted ? "STOP CHECKPOINT / VERIFIED" : "EXECUTION HELD"}
+          </p>
+          <h2 id="held-title">
+            {interrupted
+              ? "Interrupted. Nothing released."
+              : "The boundary held."}
+          </h2>
+          <p>
+            {interrupted
+              ? "The issued token was invalidated while the replay was running. The backend returned no result and no source records."
+              : "The policy gate denied this replay. The request still has an inspectable receipt."}
+          </p>
+        </div>
+        <Icon name="stop" size={35} />
+      </div>
+      <dl className="held-facts">
+        <div>
+          <dt>Result</dt>
+          <dd>Not emitted</dd>
+        </div>
+        <div>
+          <dt>Source records</dt>
+          <dd>{outcome.sources.length}</dd>
+        </div>
+        <div>
+          <dt>Stop generation</dt>
+          <dd>{outcome.receipt.stop_generation}</dd>
+        </div>
+        <div>
+          <dt>Policy decision</dt>
+          <dd>{outcome.policy.code}</dd>
+        </div>
+      </dl>
+      <button className="text-button" onClick={onInspect}>
+        Inspect this receipt
+        <Icon name="arrow" size={17} />
+      </button>
+    </section>
+  );
+}
+
 function ReceiptList({
   receipts,
   emptyAction,
   filtered = false,
   unavailable = false,
+  revealReceiptId,
 }: {
   receipts: Receipt[];
   emptyAction?: () => void;
   filtered?: boolean;
   unavailable?: boolean;
+  revealReceiptId?: string;
 }) {
   if (!receipts.length && unavailable && !filtered)
     return (
@@ -803,7 +934,11 @@ function ReceiptList({
         <span />
       </div>
       {receipts.map((receipt) => (
-        <details className="receipt-row" key={receipt.receipt_id}>
+        <details
+          className="receipt-row"
+          key={receipt.receipt_id}
+          open={receipt.receipt_id === revealReceiptId ? true : undefined}
+        >
           <summary>
             <span className="receipt-action">
               <span className={`receipt-symbol ${receipt.status}`}>
@@ -888,14 +1023,16 @@ function Ledger({
   connected,
   refresh,
   onDispatch,
+  initialQuery = "",
 }: {
   receipts: Receipt[];
   connected: boolean;
   refresh: () => Promise<void>;
   onDispatch: () => void;
+  initialQuery?: string;
 }) {
   const [filter, setFilter] = useState<ReceiptFilter>("all");
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(initialQuery);
   const normalizedSearch = search.trim().toLowerCase();
   const shown = receipts.filter(
     (receipt) =>
@@ -952,6 +1089,7 @@ function Ledger({
       </div>
       <ReceiptList
         receipts={shown}
+        revealReceiptId={initialQuery}
         filtered={receipts.length > 0}
         unavailable={!connected}
         emptyAction={receipts.length ? undefined : onDispatch}
@@ -1069,6 +1207,16 @@ function OperatingRules({
 
 function shortHash(value: string) {
   return `${value.slice(0, 8)}…${value.slice(-6)}`;
+}
+
+function clearResultAnchor() {
+  if (window.location.hash === "#run-result") {
+    window.history.replaceState(
+      null,
+      "",
+      window.location.pathname + window.location.search,
+    );
+  }
 }
 function actionLabel(kind: string) {
   return (
