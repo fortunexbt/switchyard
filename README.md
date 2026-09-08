@@ -6,6 +6,8 @@ The current release is intentionally an **offline proof**, not an assistant with
 
 The interface opens directly on the orbital relay recovery drill. Replay the incident, inspect the returned policy checks and captured evidence, then expand its receipt in the searchable ledger. The stop control remains available while reading the page; reset requires an explicit acknowledgement.
 
+Try the static demo at <https://fortunexbt.github.io/switchyard/>. GitHub Pages runs the same interface in browser-only demo mode; the local checkout remains the full FastAPI-backed control plane.
+
 The optional receipt annotation changes the request fingerprint, not the fixture result. A disconnected backend is shown as unconfirmed and cannot admit a replay.
 
 ## What is real
