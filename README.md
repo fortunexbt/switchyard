@@ -4,7 +4,9 @@ Switchyard is a local-first operator console built around one promise: an execut
 
 The current release is intentionally an **offline proof**, not an assistant with imaginary integrations. It replays one versioned incident fixture through a real policy gate, invalidates in-flight work with generation tokens, and persists audit receipts containing fingerprints instead of operator commands or result bodies.
 
-![Switchyard local operator console with its visible policy route and stop boundary](./assets/switchyard-console.png)
+The interface opens directly on the orbital relay recovery drill. Replay the incident, inspect the returned policy checks and captured evidence, then expand its receipt in the searchable ledger. The stop control remains available while reading the page; reset requires an explicit acknowledgement.
+
+The optional receipt annotation changes the request fingerprint, not the fixture result. A disconnected backend is shown as unconfirmed and cannot admit a replay.
 
 ## What is real
 
@@ -69,7 +71,7 @@ Then open <http://127.0.0.1:3000>.
 ./scripts/check.sh
 ```
 
-The check runs the backend suite (including the previously missing async test support), Python dependency audit, frontend typecheck/build/audit, and a high-signal secret scan.
+The check runs the backend suite, Python dependency audit, frontend response-contract tests, typecheck/build/audit, and a high-signal secret scan.
 
 ## API surface
 
