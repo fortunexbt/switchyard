@@ -1,18 +1,16 @@
 # Switchyard
 
-Switchyard is a local-first operator console built around one promise: an execution route is useful only if it can be inspected, stopped, and accounted for.
+An operator console where every action crosses a policy gate, any run can be stopped mid-flight, and the record keeps fingerprints instead of commands.
 
-The current release is intentionally an **offline proof**, not an assistant with imaginary integrations. It replays one versioned incident fixture through a real policy gate, invalidates in-flight work with generation tokens, and persists audit receipts containing fingerprints instead of operator commands or result bodies.
+**Live demo: <https://switchyard-phi.vercel.app>**. Press *Replay incident*, then *Stop* within four seconds.
 
-The interface opens directly on the orbital relay recovery drill. Replay the incident, inspect the returned policy checks and captured evidence, then expand its receipt in the searchable ledger. The stop control remains available while reading the page; reset requires an explicit acknowledgement.
+![Switchyard console with a replay stopped at the fixture stage](docs/switchyard-console.png)
 
-![Switchyard console showing the orbital relay recovery drill](assets/switchyard-console.png)
+## What it does
 
-Try the static demo at <https://fortunexbt.github.io/switchyard/>. GitHub Pages runs the same interface in browser-only demo mode; the local checkout remains the full FastAPI-backed control plane.
+Switchyard replays one versioned incident fixture, an orbital relay recovery drill, through a deny-by-default gate. The replay is paced on purpose so you can stop it. A completed run releases the captured evidence. A stopped run releases nothing except its receipt. Reset needs an explicit acknowledgement and is recorded too.
 
-The optional receipt annotation changes the request fingerprint, not the fixture result. A disconnected backend is shown as unconfirmed and cannot admit a replay.
-
-## What is real
+It is an offline proof, not an assistant with imaginary integrations:
 
 | Capability | Status | Evidence |
 | --- | --- | --- |
@@ -22,10 +20,9 @@ The optional receipt annotation changes the request fingerprint, not the fixture
 | Audited stop and reset | Implemented | Separate control routes and receipt rows |
 | Body-free receipt ledger | Implemented | Reduced SQLite schema and byte-level privacy test |
 | Live web, email, files, repos, or messaging | **Not implemented** | No provider or adapter code ships |
-| Voice input or output | **Not implemented** | No browser or server voice claim ships |
 | External write actions | **Denied** | No write capability exists in proof mode |
 
-## The route
+## How it works
 
 ```mermaid
 flowchart LR
@@ -41,7 +38,13 @@ flowchart LR
     R --> D[(SQLite metadata only)]
 ```
 
-Every execution and control mutation enters `ActionGateway`. Read-only health, state, and receipt-list endpoints do not create receipts, because doing so would make observation mutate the ledger.
+Every execution and control mutation enters `ActionGateway`. A stop increments a generation counter, and the executor checks its token against it at every checkpoint, so a run already past the gate is still held. Read-only health, state and receipt endpoints do not create receipts. The optional receipt annotation changes the request fingerprint, not the fixture result.
+
+### The hosted demo
+
+The Vercel build sets `VITE_DEMO_MODE=true`. The console then talks to `frontend/src/lib/engine.ts`, a TypeScript port of the policy gate, stop controller, paced executor and receipt ledger, instead of the FastAPI server. Both read the same fixture file, and fingerprints match the Python implementation byte for byte; the frontend and backend suites assert the same golden hashes. In this mode the route shows each stage live (planned, gated, replaying).
+
+Limits of the demo: receipts live in the browser tab and clear on reload, there is no SQLite store, and nothing leaves the page. Run it locally for the full control plane.
 
 ## Run locally
 
@@ -69,6 +72,12 @@ docker compose up --build
 
 Then open <http://127.0.0.1:3000>.
 
+To run the browser-only demo without Python:
+
+```bash
+cd frontend && npm ci && VITE_DEMO_MODE=true npm run dev
+```
+
 ## Verify it
 
 ```bash
@@ -92,14 +101,14 @@ The server binds to `127.0.0.1` by default. CORS is an exact, non-credentialed l
 
 ## Project map
 
-- `backend/app/execution.py` — the only execution/control mutation boundary
-- `backend/app/policy.py` — compact policy allowlist
-- `backend/app/stop.py` — generation-token stop controller
-- `backend/app/storage.py` — metadata-only receipt store
-- `backend/app/demo_data/` — versioned deterministic evidence
-- `frontend/` — responsive React dispatch console
-- `ARCH.md` — invariants and extension contract
-- `SECURITY.md` — threat model, mitigations, and known risks
-- `RUN.md` — operator runbook
+- `backend/app/execution.py`: the only execution/control mutation boundary
+- `backend/app/policy.py`: compact policy allowlist
+- `backend/app/stop.py`: generation-token stop controller
+- `backend/app/storage.py`: metadata-only receipt store
+- `backend/app/demo_data/`: versioned deterministic evidence
+- `frontend/`: responsive React dispatch console
+- `ARCH.md`: invariants and extension contract
+- `SECURITY.md`: threat model, mitigations, and known risks
+- `RUN.md`: operator runbook
 
 Licensed under the [MIT License](LICENSE).
