@@ -470,7 +470,7 @@ textarea {
   color: var(--muted);
 }
 .form-validation {
-  color: #ad482a;
+  color: var(--accent);
   font-size: 11px;
   line-height: 1.7;
   margin-top: 12px;
@@ -529,7 +529,7 @@ textarea {
   fill: var(--raised);
 }
 .stop-track text {
-  fill: #626f51;
+  fill: #8e998e;
   font: 10px var(--mono);
 }
 .stop-track.latched path,
@@ -554,7 +554,7 @@ textarea {
   stroke-width: 1;
 }
 .node-number {
-  fill: #5c7445;
+  fill: #8eaa83;
   font: 13px var(--mono);
 }
 .node-title {
@@ -680,7 +680,7 @@ textarea {
   background: #a9b998;
 }
 .check-icon.pass {
-  color: #5e8047;
+  color: #8eaa83;
   border-color: #97af7f;
 }
 .check-icon.fail {
@@ -933,7 +933,7 @@ textarea {
   gap: 6px;
   font: 10px var(--mono);
   white-space: nowrap;
-  color: #598148;
+  color: #8eaa83;
   align-self: flex-start;
 }
 .result-badge:hover {
@@ -959,7 +959,7 @@ textarea {
   flex-shrink: 0;
 }
 .held-result .overline {
-  color: #a3472a;
+  color: var(--accent);
 }
 .held-result h2 {
   font-size: 35px;
@@ -1288,7 +1288,7 @@ textarea {
   padding: 20px 0;
   border-block: 1px solid #c9744c;
   margin-bottom: 30px;
-  color: #ad482a;
+  color: var(--accent);
 }
 .connection-banner strong,
 .stop-banner strong {
@@ -1928,7 +1928,6 @@ textarea {
 .brand span { color:#f0f1eb; }
 .brand-mark { width:22px; height:25px; }
 .masthead-caption { border-color:#3b433b; color:#8d968b; font:9px/1.4 var(--mono); text-transform:uppercase; letter-spacing:.5px; }
-.runtime-mode { color:#798178; }
 .connection { color:#b4c6ad; font:10px var(--mono); }
 .stop-control { border-color:var(--accent); color:var(--accent); padding:9px 12px; font-size:10px; }
 .stop-control:hover { background:var(--accent-fill); border-color:var(--accent-fill); color:#fff; }
@@ -1972,7 +1971,7 @@ h1>span { color:#8eaa83; }
 .signal-grid,.held-facts { border-color:#3b433b; }
 .signal-grid>div { border-color:#3b433b; }
 .signal-grid strong { font-size:14px; color:#c3d0bf; }
-.page-footer { border-color:#3b433b; color:#748073; }
+.page-footer { border-color:var(--line); color:var(--muted); }
 .reset-dialog { background:#202720; color:#eef1e9; border-color:#5b6b58; }
 .reset-dialog p { color:#a2aea0; }
 .secondary-button { border-color:#778778; color:#dce5d7; background:transparent; }
