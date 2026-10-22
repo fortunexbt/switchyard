@@ -71,7 +71,8 @@ code,
   left: 24px;
   z-index: 50;
   padding: 12px;
-  background: #fff;
+  background: var(--ink);
+  color: var(--ground);
 }
 .skip-link:focus {
   top: 8px;
@@ -776,7 +777,7 @@ textarea {
   display: none;
 }
 .receipt-row > summary:hover {
-  background: #e9eddf;
+  background: var(--raised);
 }
 .receipt-action {
   display: flex;
@@ -831,7 +832,7 @@ textarea {
   grid-template-columns: 2fr 1fr 1fr 1fr;
   gap: 23px;
   padding: 23px;
-  background: #e9efdf;
+  background: var(--raised);
   border-top: 1px solid var(--line);
 }
 .receipt-details > div {
@@ -1963,7 +1964,6 @@ h1>span { color:#8eaa83; }
 .receipt-list { border-color:#3b433b; }
 .receipt-columns { border-color:#3b433b; color:#788578; }
 .receipt-row { border-color:#303830; }
-.receipt-row>summary:hover { background:#202720; }
 .receipt-action strong { color:#d8e0d5; }
 .receipt-policy,.receipt-hash,.receipt-row time { color:#95a58f; }
 .result-panel,.held-result { border-color:#5c6c59; }

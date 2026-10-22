@@ -1197,8 +1197,10 @@ function Ledger({
         emptyAction={receipts.length ? undefined : onDispatch}
       />
       <p className="ledger-footnote">
-        The latest receipts returned by your local backend. Records contain
-        metadata and fingerprints only.
+        {DEMO_MODE
+          ? "Receipts kept by the gateway in this tab. They clear on reload."
+          : "The latest receipts returned by your local backend."}{" "}
+        Records contain metadata and fingerprints only.
       </p>
     </section>
   );
