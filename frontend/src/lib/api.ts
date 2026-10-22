@@ -81,7 +81,7 @@ export type ControlResponse = {
 };
 export type ReceiptPage = { receipts: Receipt[] };
 
-const DEMO_MODE = import.meta.env?.VITE_DEMO_MODE === "true";
+export const DEMO_MODE = import.meta.env?.VITE_DEMO_MODE === "true";
 let browserGateway: Gateway | null = null;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
