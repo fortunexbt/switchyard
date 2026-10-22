@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from "react";
-import type { FormEvent, ReactNode } from "react";
+import type { CSSProperties, FormEvent, ReactNode } from "react";
 import { useControlPlane } from "../hooks/useControlPlane";
-import type {
-  ActionResponse,
-  DemoResult,
-  Receipt,
-  SystemState,
+import {
+  DEMO_MODE,
+  type ActionResponse,
+  type DemoResult,
+  type Receipt,
+  type SystemState,
 } from "../lib/api";
+import type { RouteEvent } from "../lib/engine";
 
 type View = "dispatch" | "receipts" | "policy";
 type ReceiptFilter = "all" | Receipt["status"];
@@ -132,13 +134,22 @@ function BrandMark() {
 
 function App() {
   const plane = useControlPlane();
-  const { system, receipts, outcome, busy, controlBusy, connection, notice } =
-    plane;
+  const {
+    system,
+    receipts,
+    outcome,
+    busy,
+    route,
+    controlBusy,
+    connection,
+    notice,
+  } = plane;
   const [view, setView] = useState<View>("dispatch");
   const [command, setCommand] = useState(DEFAULT_COMMAND);
   const [confirmReset, setConfirmReset] = useState(false);
   const [ledgerQuery, setLedgerQuery] = useState("");
   const resetDialog = useRef<HTMLDialogElement>(null);
+  const routeSurface = useRef<HTMLDivElement>(null);
   const connected = connection === "connected";
   const stopped = system?.stop.enabled ?? false;
   const canDispatch =
@@ -169,7 +180,19 @@ function App() {
 
   function dispatch(event?: FormEvent) {
     event?.preventDefault();
-    if (canDispatch) void plane.dispatch(command);
+    if (!canDispatch) return;
+    void plane.dispatch(command);
+    // On narrow screens the route sits below the form; bring it into view so
+    // the run can be watched while it is gated and replayed.
+    const surface = routeSurface.current;
+    if (surface && surface.getBoundingClientRect().top > window.innerHeight * 0.6) {
+      surface.scrollIntoView({
+        block: "start",
+        behavior: matchMedia("(prefers-reduced-motion: reduce)").matches
+          ? "instant"
+          : "smooth",
+      });
+    }
   }
 
   return (
@@ -195,7 +218,9 @@ function App() {
           <span className={`connection ${connection}`}>
             <i />
             {connected
-              ? "Connected locally"
+              ? DEMO_MODE
+                ? "Gateway in this browser"
+                : "Connected locally"
               : connection === "connecting"
                 ? "Connecting…"
                 : "Backend unavailable"}
@@ -251,7 +276,7 @@ function App() {
           <div>
             <p className="overline">
               {view === "dispatch"
-                ? "INSPECTION DRILL / 2026.07.1"
+                ? "OPERATOR CONSOLE / OFFLINE PROOF"
                 : view === "receipts"
                   ? "THE RECORD"
                   : "THE CONTRACT"}
@@ -259,9 +284,9 @@ function App() {
             <h1>
               {view === "dispatch" ? (
                 <>
-                  Orbital relay
+                  Every action crosses a gate.
                   <br />
-                  <span>recovery.</span>
+                  <span>Any run can be stopped.</span>
                 </>
               ) : view === "receipts" ? (
                 <>
@@ -293,7 +318,7 @@ function App() {
             )}
             <p>
               {view === "dispatch"
-                ? "A drifting relay. An overlapping maintenance window. Investigate the captured evidence inside a read-only boundary."
+                ? "Loaded drill: orbital relay recovery. A drifting relay overlaps a maintenance window, and the replay reads captured evidence inside a read-only boundary."
                 : view === "receipts"
                   ? "A local record of replays, stops, and resets. Expand a row to inspect the full receipt."
                   : "One fixed incident. Three allowed capabilities. Everything else is denied."}
@@ -378,11 +403,26 @@ function App() {
                     </p>
                   )}
                   {busy && (
-                    <p className="inspection-hint">
-                      <span className="pending-mark" aria-hidden="true" />
-                      Use <strong>Stop execution</strong> before the replay
-                      finishes.
-                    </p>
+                    <button
+                      type="button"
+                      className="inline-stop"
+                      onClick={() => void plane.stopNow()}
+                      disabled={controlBusy}
+                    >
+                      <Icon name="stop" size={14} />
+                      Stop it before the replay finishes
+                      {route?.stage === "executing" && (
+                        <span
+                          className="inspection-clock"
+                          aria-hidden="true"
+                          style={
+                            {
+                              "--inspection-ms": `${route.inspectionMs}ms`,
+                            } as CSSProperties
+                          }
+                        />
+                      )}
+                    </button>
                   )}
                   {outcome && !busy && (
                     <a className="result-jump" href="#run-result">
@@ -423,7 +463,7 @@ function App() {
                   </p>
                 </details>
               </form>
-              <div className="route-surface">
+              <div className="route-surface" ref={routeSurface}>
                 <div className="section-label">
                   <span>02</span> Execution route
                   <strong className={stopped && connected ? "held-label" : ""}>
@@ -432,19 +472,22 @@ function App() {
                       : stopped
                         ? "Stop latched"
                         : busy
-                          ? "Request pending"
+                          ? route
+                            ? "Replay running"
+                            : "Request pending"
                           : "Boundary open"}
                   </strong>
                 </div>
                 <RouteDiagram
                   outcome={outcome}
                   busy={busy}
+                  route={route}
                   stopped={connected && stopped}
                 />
                 <div className="route-reading">
                   <span>
                     {busy
-                      ? "Paced replay requested. Waiting for the backend receipt."
+                      ? routeReading(route)
                       : outcome
                         ? outcome.receipt.status === "completed"
                           ? "Last replay completed. Its receipt is recorded below."
@@ -573,60 +616,119 @@ function App() {
   );
 }
 
+const ROUTE_NODES = [
+  { x: 68, title: "Instruction", sub: "DECLARE" },
+  { x: 244, title: "Policy gate", sub: "CHECK" },
+  { x: 420, title: "Fixture", sub: "REPLAY" },
+  { x: 596, title: "Receipt", sub: "RECORD" },
+];
+
+type NodeState = "idle" | "active" | "done" | "held";
+
+// Node states for the route: live stage events while a replay runs, then the
+// recorded outcome. A stop during the replay means the gate admitted the run.
+function routeStates(
+  outcome: ActionResponse | null,
+  busy: boolean,
+  route: RouteEvent | null,
+): NodeState[] {
+  if (busy) {
+    if (!route) return ["idle", "idle", "idle", "idle"];
+    if (route.stage === "planned") return ["done", "active", "idle", "idle"];
+    if (route.stage === "gated")
+      return route.policy.allowed
+        ? ["done", "done", "active", "idle"]
+        : ["done", "held", "idle", "active"];
+    return ["done", "done", "active", "idle"];
+  }
+  if (!outcome) return ["idle", "idle", "idle", "idle"];
+  if (outcome.receipt.status === "completed")
+    return ["done", "done", "done", "done"];
+  const admitted =
+    outcome.policy.allowed ||
+    outcome.policy.code === "denied.stop-during-execution";
+  return admitted
+    ? ["done", "done", "held", "done"]
+    : ["done", "held", "idle", "done"];
+}
+
+function routeReading(route: RouteEvent | null) {
+  if (!route) return "Paced replay requested. Waiting for the backend receipt.";
+  if (route.stage === "planned") return "Plan built. Checking the policy gate.";
+  if (route.stage === "gated")
+    return route.policy.allowed
+      ? `Gate passed. Token issued at generation ${String(route.generation).padStart(2, "0")}.`
+      : `Gate denied: ${route.policy.code}`;
+  return "Replaying the fixture. The stop token is checked every 100 ms.";
+}
+
 function RouteDiagram({
   outcome,
   busy,
+  route,
   stopped,
 }: {
   outcome: ActionResponse | null;
   busy: boolean;
+  route: RouteEvent | null;
   stopped: boolean;
 }) {
-  const complete = outcome?.receipt.status === "completed";
-  const admitted = outcome?.policy.allowed;
-  const nodes = [
-    { x: 68, title: "Instruction", sub: "DECLARE" },
-    { x: 244, title: "Policy gate", sub: "CHECK" },
-    { x: 420, title: "Fixture", sub: "REPLAY" },
-    { x: 596, title: "Receipt", sub: "RECORD" },
-  ];
+  const states = routeStates(outcome, busy, route);
+  // The lit track ends at the furthest stage the run reached; the receipt
+  // joins it only when the replay completed.
+  const trackEnd = states.every((state) => state === "done")
+    ? 596
+    : states[2] !== "idle"
+      ? 420
+      : states[1] !== "idle"
+        ? 244
+        : 0;
+  const executing = busy && route?.stage === "executing";
+  const label = busy
+    ? route
+      ? routeReading(route)
+      : "Request pending; individual stage progress is not available."
+    : outcome
+      ? `Last request ${outcome.receipt.status}.`
+      : "No request dispatched.";
   return (
     <svg
-      className={`route-diagram ${busy ? "is-pending" : ""}`}
+      className={`route-diagram ${busy && !route ? "is-pending" : ""}`}
       viewBox="0 0 664 220"
       role="img"
-      aria-label={`Route: instruction, policy gate, fixture replay, receipt. ${busy ? "Request pending; individual stage progress is not available." : outcome ? `Last request ${outcome.receipt.status}.` : "No request dispatched."} ${stopped ? "Stop boundary latched." : ""}`}
+      aria-label={`Route: instruction, policy gate, fixture replay, receipt. ${label} ${stopped ? "Stop boundary latched." : ""}`}
     >
-      <g className={stopped ? "stop-track latched" : "stop-track"}>
+      <g
+        className={`stop-track ${stopped ? "latched" : executing ? "armed" : ""}`}
+      >
         <path d="M244 112V48H420V112" />
         <rect x="284" y="33" width="96" height="29" />
         <text x="332" y="52" textAnchor="middle">
-          {stopped ? "STOPPED" : "STOP TOKEN"}
+          {stopped ? "STOPPED" : executing ? "TOKEN LIVE" : "STOP TOKEN"}
         </text>
       </g>
       <path className="track-base" d="M68 112H596" />
-      <path
-        className={`track-active ${outcome ? "has-outcome" : ""}`}
-        d={complete ? "M68 112H596" : "M68 112H244"}
-      />
+      {trackEnd > 0 && (
+        <path className="track-active" d={`M68 112H${trackEnd}`} />
+      )}
+      {executing && (
+        <path
+          key={route.inspectionMs}
+          className="track-progress"
+          d="M439 112H577"
+          pathLength={1}
+          style={
+            { "--inspection-ms": `${route.inspectionMs}ms` } as CSSProperties
+          }
+        />
+      )}
       <g className="track-arrows">
         <path d="m151 107 5 5-5 5m176-10 5 5-5 5m176-10 5 5-5 5" />
       </g>
-      {nodes.map((node, index) => {
-        const done =
-          !!outcome &&
-          (index === 0 ||
-            (index === 1 && admitted) ||
-            (index === 2 && complete) ||
-            index === 3);
-        const held =
-          !!outcome &&
-          ((index === 1 && !admitted) || (index === 2 && !complete));
+      {ROUTE_NODES.map((node, index) => {
+        const state = states[index];
         return (
-          <g
-            key={node.title}
-            className={`diagram-node ${done ? "done" : ""} ${held ? "held" : ""}`}
-          >
+          <g key={node.title} className={`diagram-node ${state}`}>
             <rect
               className="node-core"
               x={node.x - 19}
@@ -634,7 +736,7 @@ function RouteDiagram({
               width="38"
               height="38"
             />
-            {done ? (
+            {state === "done" ? (
               <path className="node-check" d={`m${node.x - 6} 112 4 4 8-9`} />
             ) : (
               <text
@@ -1095,8 +1197,10 @@ function Ledger({
         emptyAction={receipts.length ? undefined : onDispatch}
       />
       <p className="ledger-footnote">
-        The latest receipts returned by your local backend. Records contain
-        metadata and fingerprints only.
+        {DEMO_MODE
+          ? "Receipts kept by the gateway in this tab. They clear on reload."
+          : "The latest receipts returned by your local backend."}{" "}
+        Records contain metadata and fingerprints only.
       </p>
     </section>
   );

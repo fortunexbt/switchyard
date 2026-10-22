@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  DEMO_MODE,
   isControlResponse,
   isReceiptPage,
   isSystemState,
@@ -9,6 +10,7 @@ import {
   type Receipt,
   type SystemState,
 } from "../lib/api.ts";
+import type { RouteEvent } from "../lib/engine.ts";
 
 export type Connection = "connecting" | "connected" | "unavailable";
 
@@ -17,10 +19,14 @@ export function useControlPlane() {
   const [receipts, setReceipts] = useState<Receipt[]>([]);
   const [outcome, setOutcome] = useState<ActionResponse | null>(null);
   const [busy, setBusy] = useState(false);
+  // Stage events exist only for the in-browser gateway; HTTP replies arrive whole.
+  const [route, setRoute] = useState<RouteEvent | null>(null);
   const [controlBusy, setControlBusy] = useState(false);
   const [connection, setConnection] = useState<Connection>("connecting");
   const [notice, setNotice] = useState(
-    "Connecting to the local control plane…",
+    DEMO_MODE
+      ? "Starting the in-browser gateway…"
+      : "Connecting to the local control plane…",
   );
   const mounted = useRef(true);
   const currentSystem = useRef<SystemState | null>(null);
@@ -75,7 +81,9 @@ export function useControlPlane() {
             setNotice(
               nextSystem.stop.enabled
                 ? "Stop boundary latched. Reset requires acknowledgement."
-                : "Local control plane connected. Fixture replay is available.",
+                : DEMO_MODE
+                  ? "Gateway running in this browser. Fixture replay is available."
+                  : "Local control plane connected. Fixture replay is available.",
             );
           }
         } catch {
@@ -133,13 +141,16 @@ export function useControlPlane() {
       revision.current += 1;
       const owner = ++noticeOwner.current;
       setBusy(true);
+      setRoute(null);
       setOutcome(null);
       operationNotice(
         owner,
         "Dispatch submitted. Waiting for the policy decision and receipt…",
       );
       try {
-        const response = await requestAction(trimmed);
+        const response = await requestAction(trimmed, (event) => {
+          if (mounted.current) setRoute(event);
+        });
         revision.current += 1;
         if (!mounted.current) return;
         setOutcome(response);
@@ -166,7 +177,10 @@ export function useControlPlane() {
       } finally {
         if (mounted.current) await refresh();
         dispatchLock.current = false;
-        if (mounted.current) setBusy(false);
+        if (mounted.current) {
+          setBusy(false);
+          setRoute(null);
+        }
       }
     },
     [operationNotice, refresh, updateConnection],
@@ -274,6 +288,7 @@ export function useControlPlane() {
     receipts,
     outcome,
     busy,
+    route,
     controlBusy,
     connection,
     notice,

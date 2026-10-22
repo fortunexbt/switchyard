@@ -1,3 +1,5 @@
+import { Gateway, handle, type RouteEvent } from "./engine.ts";
+
 export type StopState = {
   enabled: boolean;
   reason_code: string | null;
@@ -79,60 +81,8 @@ export type ControlResponse = {
 };
 export type ReceiptPage = { receipts: Receipt[] };
 
-const DEMO_MODE = import.meta.env?.VITE_DEMO_MODE === "true" ||
-  (import.meta.env?.PROD && typeof window !== "undefined" && window.location.hostname.endsWith("github.io"));
-let demoStop: StopState = { enabled: false, reason_code: null, generation: 0 };
-const demoReceipts: Receipt[] = [];
-const demoResult: DemoResult = {
-  fixture_id: "orbital-relay-recovery",
-  fixture_version: "2026.07.1",
-  headline: "Recovery route held inside the offline safety envelope",
-  summary: "Switchyard replayed a captured relay incident, admitted only the read-only fixture capability, and produced a receipt without storing the operator command or result body.",
-  signals: [
-    { label: "Relay heartbeat", value: "17 s jitter in captured telemetry", state: "watch" },
-    { label: "Write authority", value: "No write capability present", state: "held" },
-    { label: "Evidence bundle", value: "3 embedded records matched", state: "nominal" },
-  ],
-  recommended_sequence: [
-    "Hold outbound commands at the policy gate.",
-    "Compare heartbeat drift with the captured maintenance window.",
-    "Prepare a human-reviewed recovery proposal outside this demo.",
-  ],
-  disclosure: "Embedded deterministic fixture; no network or live system was contacted.",
-};
-
-function demoReceipt(kind: string, status: Receipt["status"], policyCode: string): Receipt {
-  const fingerprint = "a5a993fb32cc5363c25005e7c2896151f31a1dfc88cfb2c551cef982559235a3";
-  return {
-    receipt_id: `demo_${kind}_${Date.now()}`,
-    created_at: new Date().toISOString(), status, action_kind: kind,
-    capability: kind === "fixture.replay" ? "fixtures.read" : kind === "stop.enable" ? "control.stop" : "control.reset",
-    policy_code: policyCode, stop_generation: demoStop.generation,
-    request_fingerprint: fingerprint,
-    result_fingerprint: status === "completed" && kind === "fixture.replay" ? "440cfd9feaf44d014d80d6fd273032e4f1372bf0229f151e2a64fa4d47063b08" : null,
-    synthetic: true,
-  };
-}
-
-function demoAction(): ActionResponse {
-  const policy: PolicyDecision = {
-    allowed: true, code: "allowed.offline-proof", policy_version: "switchyard-policy/1",
-    checks: [
-      { code: "capability.allowlisted", passed: true }, { code: "executor.synthetic", passed: true },
-      { code: "stop.open-or-control", passed: true }, { code: "writes.denied", passed: true },
-    ],
-  };
-  const receipt = demoReceipt("fixture.replay", "completed", policy.code);
-  return {
-    plan: { plan_id: "demo_plan", actions: [{ action_id: "demo_action", kind: "fixture.replay", capability: "fixtures.read", risk: "read_only", synthetic: true, summary: "Replay the embedded relay-recovery evidence bundle." }] },
-    policy, result: demoResult,
-    sources: [
-      { source_id: "telemetry-window-07", label: "Captured telemetry window 07", captured_at: "2026-07-21T09:30:00Z", fingerprint: "b".repeat(64), kind: "embedded_fixture" },
-      { source_id: "maintenance-ledger-04", label: "Synthetic maintenance ledger 04", captured_at: "2026-07-21T09:31:00Z", fingerprint: "c".repeat(64), kind: "embedded_fixture" },
-      { source_id: "policy-envelope-01", label: "Offline policy envelope 01", captured_at: "2026-07-21T09:32:00Z", fingerprint: "d".repeat(64), kind: "embedded_fixture" },
-    ], receipt,
-  };
-}
+export const DEMO_MODE = import.meta.env?.VITE_DEMO_MODE === "true";
+let browserGateway: Gateway | null = null;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -378,7 +328,14 @@ export function resolveApiBase(
 async function readResponse(
   path: string,
   init: RequestInit = {},
-): Promise<{ response: Response; payload: unknown }> {
+  onEvent?: (event: RouteEvent) => void,
+): Promise<{ ok: boolean; status: number; payload: unknown }> {
+  if (DEMO_MODE) {
+    browserGateway ??= new Gateway();
+    const body = typeof init.body === "string" ? (JSON.parse(init.body) as unknown) : undefined;
+    const reply = await handle(browserGateway, init.method ?? "GET", path, body, onEvent);
+    return { ok: reply.status < 300, status: reply.status, payload: reply.payload };
+  }
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 12_000);
   try {
@@ -391,7 +348,7 @@ async function readResponse(
       cache: "no-store",
       headers: { "Content-Type": "application/json" },
     });
-    return { response, payload: (await response.json()) as unknown };
+    return { ok: response.ok, status: response.status, payload: (await response.json()) as unknown };
   } finally {
     clearTimeout(timeout);
   }
@@ -402,29 +359,29 @@ export async function requestJson<T>(
   validate: (value: unknown) => value is T,
   init: RequestInit = {},
 ): Promise<T> {
-  if (DEMO_MODE) {
-    if (path === "/api/state") return { mode: "offline-proof", stop: demoStop, capabilities: ["fixtures.read", "control.stop", "control.reset"], limitations: ["No network providers or live integrations are implemented.", "Demo mode runs entirely in the browser.", "Receipts prove local processing metadata, not external-world truth."] } as T;
-    if (path === "/api/receipts") return { receipts: demoReceipts } as T;
-    if (path === "/api/stop") { demoStop = { enabled: true, reason_code: "operator-stop", generation: demoStop.generation + 1 }; const receipt = demoReceipt("stop.enable", "completed", "allowed.offline-proof"); demoReceipts.unshift(receipt); return { state: demoStop, policy: { allowed: true, code: "allowed.offline-proof", policy_version: "switchyard-policy/1", checks: [] }, receipt } as T; }
-    if (path === "/api/stop/reset") { demoStop = { enabled: false, reason_code: null, generation: demoStop.generation + 1 }; const receipt = demoReceipt("stop.reset", "completed", "allowed.offline-proof"); demoReceipts.unshift(receipt); return { state: demoStop, policy: { allowed: true, code: "allowed.offline-proof", policy_version: "switchyard-policy/1", checks: [] }, receipt } as T; }
-  }
-  const { response, payload } = await readResponse(path, init);
-  if (!response.ok || !validate(payload))
+  const { ok, payload } = await readResponse(path, init);
+  if (!ok || !validate(payload))
     throw new Error("Invalid control plane response");
   return payload;
 }
 
-export async function requestAction(command: string): Promise<ActionResponse> {
-  if (DEMO_MODE) { const response = demoAction(); demoReceipts.unshift(response.receipt); return response; }
-  const { response, payload } = await readResponse("/api/actions", {
-    method: "POST",
-    body: JSON.stringify({ command, fixture_id: "orbital-relay-recovery" }),
-  });
+export async function requestAction(
+  command: string,
+  onEvent?: (event: RouteEvent) => void,
+): Promise<ActionResponse> {
+  const { ok, status, payload } = await readResponse(
+    "/api/actions",
+    {
+      method: "POST",
+      body: JSON.stringify({ command, fixture_id: "orbital-relay-recovery" }),
+    },
+    onEvent,
+  );
   if (!isActionResponse(payload)) throw new Error("Invalid action receipt");
   const expectedHold =
     !payload.policy.allowed &&
-    ((response.status === 403 && payload.receipt.status === "blocked") ||
-      (response.status === 423 && payload.receipt.status === "stopped"));
-  if (!response.ok && !expectedHold) throw new Error("Action request failed");
+    ((status === 403 && payload.receipt.status === "blocked") ||
+      (status === 423 && payload.receipt.status === "stopped"));
+  if (!ok && !expectedHold) throw new Error("Action request failed");
   return payload;
 }
