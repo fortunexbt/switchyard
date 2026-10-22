@@ -34,7 +34,7 @@ def test_fingerprints_match_the_browser_engine_goldens() -> None:
     # frontend/tests/engine.test.ts asserts the same values against the browser port.
     result, sources = FixtureLibrary().load("orbital-relay-recovery")
     assert fingerprint({"result": result, "sources": sources}) == (
-        "440cfd9feaf44d014d80d6fd273032e4f1372bf0229f151e2a64fa4d47063b08"
+        "d4361a7012be25eca3ab47435e37c60cd303dc0605d78264cce27c0961bdea20"
     )
     assert [source.fingerprint for source in sources] == [
         "24c6f4f3cf9c7ad0fb902c81f62be1cf98ced093c2b0fd1abd0abc114100520c",

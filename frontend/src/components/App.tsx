@@ -15,7 +15,7 @@ import {
 import { CHECKPOINT_MS, INSPECTION_MS, type RouteEvent } from "../lib/engine";
 
 const DEFAULT_COMMAND =
-  "Trace the safest recovery route for the captured orbital relay incident.";
+  "Trace a recovery route for the orbital relay drill.";
 const SOURCE_URL = "https://github.com/fortunexbt/switchyard";
 const GATE_CHECKS = [
   "capability.allowlisted",
@@ -139,9 +139,9 @@ function App() {
           Switchyard
         </h1>
         <p className="topbar-about">
-          Replays a recorded incident through a policy gate you can stop
-          mid-run, and writes a hashed receipt for each action. The incident
-          data is synthetic.
+          Switchyard puts a policy gate, a stop and a hash-only receipt in
+          front of the tools an agent calls. This page runs that gateway in
+          your browser against an invented incident drill.
         </p>
         <nav className="topbar-links" aria-label="Page">
           <span className={`gateway ${connection}`}>
@@ -990,7 +990,7 @@ function Rules({ system }: { system: SystemState | null }) {
                     "fixture.replay",
                     "fixtures.read",
                     "read_only",
-                    "Replays the recorded incident",
+                    "Replays the incident drill",
                   ],
                   [
                     "stop.enable",

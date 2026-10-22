@@ -9,7 +9,7 @@
 web
 
 ## Users
-Hackathon judges and engineers evaluating agent-safety tooling, opening a hosted demo cold on a laptop or phone. Secondary: the operator running it locally against the FastAPI control plane.
+Python developers who hand functions to an agent as tools and need to deny some calls, stop a run, and keep an audit trail without storing arguments. They use the `guard/` package. The hosted console shows the same pattern to someone opening it cold on a laptop or phone.
 
 ## Product Purpose
 Switchyard is a local-first operator console. It replays one versioned incident fixture (orbital relay recovery) through a deny-by-default policy gate, lets the operator stop in-flight work by invalidating generation tokens, and records body-free audit receipts (fingerprints, not commands or results). Success: a visitor sees a route planned, gated, executing, and stopped within seconds, and can inspect the receipt.
@@ -27,7 +27,7 @@ Three capabilities: fixtures.read, control.stop, control.reset. Writes always de
 Name "Switchyard". Plain, exact voice. Limitations labelled in the product.
 
 ## Evidence on Hand
-Fixture JSON at backend/app/demo_data/orbital-relay-recovery.json. Synthetic data only; no customers or benchmarks exist.
+Fixture JSON at backend/app/demo_data/orbital-relay-recovery.json is an invented drill and the page says so. The guard package runs on the user's own functions. No customers or benchmarks exist.
 
 ## Product Principles
 - Make the safety boundary visible.
