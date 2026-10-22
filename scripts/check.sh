@@ -3,6 +3,7 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
+"$repo_root/.venv/bin/python" -m pytest -c "$repo_root/guard/pyproject.toml" "$repo_root/guard/tests" -q -p no:asyncio
 PYTHONPATH="$repo_root/backend" "$repo_root/.venv/bin/python" -m pytest \
   -c "$repo_root/backend/pytest.ini" "$repo_root/backend/tests" -q
 "$repo_root/.venv/bin/python" -m compileall -q "$repo_root/backend/app"

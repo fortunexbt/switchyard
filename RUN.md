@@ -6,7 +6,7 @@ From the repository root:
 
 ```bash
 python -m venv .venv
-.venv/bin/python -m pip install -r backend/requirements-dev.txt
+.venv/bin/python -m pip install -r backend/requirements-dev.txt -e guard
 (cd frontend && npm ci)
 ./scripts/dev.sh
 ```
