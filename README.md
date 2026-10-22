@@ -1,12 +1,27 @@
 # Switchyard
 
-An operator console where every action crosses a policy gate, any run can be stopped mid-flight, and the record keeps fingerprints instead of commands.
+A policy gate, a stop and a hash-only receipt for the tools an agent calls. The repository has two parts. [`guard/`](guard/) is a Python package with a `@guard.gated(capability, risk)` decorator for your own tool functions. The console is a demo of the same pattern that you can open in a browser.
 
-**Live demo: <https://switchyard-phi.vercel.app>**. Press *Replay incident*, then *Stop* within four seconds.
+**Live demo: <https://switchyard-phi.vercel.app>**. Press *Replay*, then *Stop* within four seconds.
 
 ![Switchyard console with a replay stopped at the fixture stage](docs/switchyard-console.png)
 
-## What it does
+## Gate your own tools
+
+```python
+from switchyard_guard import Guard, Policy
+
+guard = Guard(Policy({"fs.read": "read"}))
+
+
+@guard.gated("fs.read", "read")
+def read_file(path: str) -> str:
+    return open(path).read()
+```
+
+Calls to ungranted capabilities raise `Denied` before the function runs, `guard.stop()` ends running calls at their next checkpoint or await, and each call writes a receipt with argument and result fingerprints only. See [guard/README.md](guard/README.md) for rules over real arguments, async cancellation, the SQLite ledger and three runnable examples.
+
+## The console
 
 Switchyard replays one versioned incident fixture, an orbital relay recovery drill, through a deny-by-default gate. The replay is paced on purpose so you can stop it. A completed run releases the captured evidence. A stopped run releases nothing except its receipt. Reset needs an explicit acknowledgement and is recorded too.
 
@@ -42,7 +57,7 @@ Every execution and control mutation enters `ActionGateway`. A stop increments a
 
 ### The hosted demo
 
-The Vercel build sets `VITE_DEMO_MODE=true`. The console then talks to `frontend/src/lib/engine.ts`, a TypeScript port of the policy gate, stop controller, paced executor and receipt ledger, instead of the FastAPI server. Both read the same fixture file, and fingerprints match the Python implementation byte for byte; the frontend and backend suites assert the same golden hashes. In this mode the route shows each stage live (planned, gated, replaying).
+The Vercel build sets `VITE_DEMO_MODE=true`. The console then talks to `frontend/src/lib/engine.ts`, a TypeScript port of the policy gate, stop controller, paced executor and receipt ledger, instead of the FastAPI server. Both read the same fixture file, and fingerprints match the Python implementation byte for byte; the frontend and backend suites assert the same golden hashes. In this mode the route shows each stage live with browser-clock timings, and the replay window marks the checkpoint where a stop held the run.
 
 Limits of the demo: receipts live in the browser tab and clear on reload, there is no SQLite store, and nothing leaves the page. Run it locally for the full control plane.
 
@@ -52,7 +67,7 @@ Requirements: Python 3.12+, Node.js 24+, and npm 10+.
 
 ```bash
 python -m venv .venv
-.venv/bin/python -m pip install -r backend/requirements-dev.txt
+.venv/bin/python -m pip install -r backend/requirements-dev.txt -e guard
 cd frontend && npm ci && cd ..
 ```
 
@@ -84,7 +99,7 @@ cd frontend && npm ci && VITE_DEMO_MODE=true npm run dev
 ./scripts/check.sh
 ```
 
-The check runs the backend suite, Python dependency audit, frontend response-contract tests, typecheck/build/audit, and a high-signal secret scan.
+The check runs the guard package tests, the backend suite, Python dependency audit, frontend response-contract tests, typecheck/build/audit, and a high-signal secret scan.
 
 ## API surface
 
@@ -101,6 +116,7 @@ The server binds to `127.0.0.1` by default. CORS is an exact, non-credentialed l
 
 ## Project map
 
+- `guard/`: the `switchyard-guard` package, its tests and examples
 - `backend/app/execution.py`: the only execution/control mutation boundary
 - `backend/app/policy.py`: compact policy allowlist
 - `backend/app/stop.py`: generation-token stop controller

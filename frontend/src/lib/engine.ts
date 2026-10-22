@@ -23,6 +23,9 @@ export type RouteEvent =
 export type EngineReply = { status: number; payload: unknown };
 
 const POLICY_VERSION = "switchyard-policy/1";
+// Same pacing as backend/app/execution.py: a 4 s window, token checked every 100 ms.
+export const INSPECTION_MS = 4_000;
+export const CHECKPOINT_MS = 100;
 const RECEIPT_LIMIT = 50;
 const ALLOWED: Record<string, [PlannedAction["capability"], PlannedAction["risk"]]> = {
   "fixture.replay": ["fixtures.read", "read_only"],
@@ -173,7 +176,7 @@ export class Gateway {
 
   private readonly inspectionMs: number;
 
-  constructor(inspectionMs = 4_000) {
+  constructor(inspectionMs = INSPECTION_MS) {
     this.inspectionMs = inspectionMs;
   }
 
@@ -242,7 +245,7 @@ export class Gateway {
     let remaining: number;
     while ((remaining = deadline - performance.now()) > 0) {
       this.stop.checkpoint(token);
-      await pause(Math.min(remaining, 100));
+      await pause(Math.min(remaining, CHECKPOINT_MS));
       this.stop.checkpoint(token);
     }
     this.stop.checkpoint(token);
