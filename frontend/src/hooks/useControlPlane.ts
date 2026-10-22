@@ -14,13 +14,21 @@ import type { RouteEvent } from "../lib/engine.ts";
 
 export type Connection = "connecting" | "connected" | "unavailable";
 
+// Browser-clock timings of the latest replay. Stage events exist only for the
+// in-browser gateway; HTTP replies arrive whole, so `events` stays empty there.
+export type RunTrace = {
+  startedAt: number;
+  events: (RouteEvent & { at: number })[];
+  stopAt: number | null;
+  settledAt: number | null;
+};
+
 export function useControlPlane() {
   const [system, setSystem] = useState<SystemState | null>(null);
   const [receipts, setReceipts] = useState<Receipt[]>([]);
   const [outcome, setOutcome] = useState<ActionResponse | null>(null);
   const [busy, setBusy] = useState(false);
-  // Stage events exist only for the in-browser gateway; HTTP replies arrive whole.
-  const [route, setRoute] = useState<RouteEvent | null>(null);
+  const [run, setRun] = useState<RunTrace | null>(null);
   const [controlBusy, setControlBusy] = useState(false);
   const [connection, setConnection] = useState<Connection>("connecting");
   const [notice, setNotice] = useState(
@@ -141,7 +149,12 @@ export function useControlPlane() {
       revision.current += 1;
       const owner = ++noticeOwner.current;
       setBusy(true);
-      setRoute(null);
+      setRun({
+        startedAt: performance.now(),
+        events: [],
+        stopAt: null,
+        settledAt: null,
+      });
       setOutcome(null);
       operationNotice(
         owner,
@@ -149,10 +162,21 @@ export function useControlPlane() {
       );
       try {
         const response = await requestAction(trimmed, (event) => {
-          if (mounted.current) setRoute(event);
+          const at = performance.now();
+          // Events can land in one batch; append so none of them is lost.
+          if (mounted.current)
+            setRun(
+              (current) =>
+                current && {
+                  ...current,
+                  events: [...current.events, { ...event, at }],
+                },
+            );
         });
         revision.current += 1;
         if (!mounted.current) return;
+        const settledAt = performance.now();
+        setRun((current) => current && { ...current, settledAt });
         setOutcome(response);
         setReceipts((current) => [
           response.receipt,
@@ -163,8 +187,8 @@ export function useControlPlane() {
         operationNotice(
           owner,
           response.receipt.status === "completed"
-            ? "Replay complete. The receipt contains fingerprints; the command body was not stored."
-            : `Dispatch held: ${response.policy.code}. A receipt was recorded.`,
+            ? "Replay complete. The receipt holds fingerprints, and the command wasn't stored."
+            : `Replay held by ${response.policy.code}. A receipt was recorded.`,
         );
       } catch {
         revision.current += 1;
@@ -177,10 +201,7 @@ export function useControlPlane() {
       } finally {
         if (mounted.current) await refresh();
         dispatchLock.current = false;
-        if (mounted.current) {
-          setBusy(false);
-          setRoute(null);
-        }
+        if (mounted.current) setBusy(false);
       }
     },
     [operationNotice, refresh, updateConnection],
@@ -205,6 +226,14 @@ export function useControlPlane() {
       revision.current += 1;
       const owner = ++noticeOwner.current;
       setControlBusy(true);
+      if (kind === "stop") {
+        const stopAt = performance.now();
+        setRun(
+          (current) =>
+            current &&
+            (current.settledAt === null ? { ...current, stopAt } : current),
+        );
+      }
       operationNotice(
         owner,
         kind === "stop"
@@ -246,11 +275,16 @@ export function useControlPlane() {
         ) {
           operationNotice(
             owner,
-            `Control request held: ${response.policy.code}.`,
+            `Control request held by ${response.policy.code}.`,
           );
         } else if (response.state.enabled !== (kind === "stop")) {
           throw new Error("Control state did not confirm the request");
         } else {
+          // The last run belongs to the boundary generation the reset closed.
+          if (kind === "reset") {
+            setOutcome(null);
+            setRun(null);
+          }
           operationNotice(
             owner,
             kind === "stop"
@@ -288,7 +322,7 @@ export function useControlPlane() {
     receipts,
     outcome,
     busy,
-    route,
+    run,
     controlBusy,
     connection,
     notice,

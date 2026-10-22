@@ -2,7 +2,7 @@
 
 An operator console where every action crosses a policy gate, any run can be stopped mid-flight, and the record keeps fingerprints instead of commands.
 
-**Live demo: <https://switchyard-phi.vercel.app>**. Press *Replay incident*, then *Stop* within four seconds.
+**Live demo: <https://switchyard-phi.vercel.app>**. Press *Replay*, then *Stop* within four seconds.
 
 ![Switchyard console with a replay stopped at the fixture stage](docs/switchyard-console.png)
 
@@ -42,7 +42,7 @@ Every execution and control mutation enters `ActionGateway`. A stop increments a
 
 ### The hosted demo
 
-The Vercel build sets `VITE_DEMO_MODE=true`. The console then talks to `frontend/src/lib/engine.ts`, a TypeScript port of the policy gate, stop controller, paced executor and receipt ledger, instead of the FastAPI server. Both read the same fixture file, and fingerprints match the Python implementation byte for byte; the frontend and backend suites assert the same golden hashes. In this mode the route shows each stage live (planned, gated, replaying).
+The Vercel build sets `VITE_DEMO_MODE=true`. The console then talks to `frontend/src/lib/engine.ts`, a TypeScript port of the policy gate, stop controller, paced executor and receipt ledger, instead of the FastAPI server. Both read the same fixture file, and fingerprints match the Python implementation byte for byte; the frontend and backend suites assert the same golden hashes. In this mode the route shows each stage live with browser-clock timings, and the replay window marks the checkpoint where a stop held the run.
 
 Limits of the demo: receipts live in the browser tab and clear on reload, there is no SQLite store, and nothing leaves the page. Run it locally for the full control plane.
 

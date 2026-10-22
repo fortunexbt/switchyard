@@ -25,11 +25,11 @@ The frontend is available at `127.0.0.1:3000`; the API is also published at `127
 
 ## Stop drill
 
-1. Select **Replay incident**. The embedded fixture deliberately waits about four seconds before releasing its result, giving you time to test the stop boundary. This is an inspection window, not live provider work or stage progress.
-2. While that replay is pending, select **Stop execution**. Confirm the boundary is latched and the generation increases.
+1. Select **Replay**. The embedded fixture deliberately waits about four seconds before releasing its result, giving you time to test the stop boundary. This is an inspection window, not live provider work or stage progress.
+2. While that replay is pending, select **Stop**. Confirm the run shows **Stop latched** and the stop generation increases.
 3. Confirm the interrupted replay produces a **stopped** receipt, policy code `denied.stop-during-execution`, and no result or result fingerprint. The API response is HTTP 423; the fixture was never loaded.
-4. Select **Reset stop** (or **Review reset**), read the dialog, then select **Acknowledge & reset**. Reset creates its own receipt and increments generation again. It does not revive the interrupted replay.
-5. Select **Replay incident** again and leave the inspection window uninterrupted. Confirm the result, source evidence, and **completed** receipt appear.
+4. Select **Reset**, read the dialog, then select **Reset stop**. Reset creates its own receipt and increments generation again. It does not revive the interrupted replay.
+5. Select **Replay** again and leave the inspection window uninterrupted. Confirm the result, source evidence, and **completed** receipt appear.
 
 New actions submitted through the API while stop is latched also return HTTP 423 with a stopped receipt and no result. Tokens issued before stop or reset remain invalid even after new work is allowed.
 
