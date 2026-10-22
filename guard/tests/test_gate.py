@@ -20,7 +20,7 @@ from switchyard_guard import (
     fingerprint,
 )
 
-SECRET = "sk-live-4f1c9e-never-store-me"
+SECRET = "private-argument-4f1c9e-never-store-me"
 
 
 def make_guard(**grants: str) -> Guard:
