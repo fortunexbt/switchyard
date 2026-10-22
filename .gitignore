@@ -4,6 +4,8 @@
 !.env.example
 .venv/
 __pycache__/
+*.egg-info/
+build/
 *.py[cod]
 .pytest_cache/
 .coverage

@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=80"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "switchyard-guard"
+version = "0.1.0"
+description = "Gate, stop and receipt the tool functions an agent calls"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.urls]
+Source = "https://github.com/fortunexbt/switchyard"
+
+[tool.setuptools.package-data]
+switchyard_guard = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
