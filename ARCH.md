@@ -7,7 +7,7 @@ Switchyard is deliberately smaller than its interface suggests. The console visu
 1. **One mutation boundary.** HTTP routes cannot invoke an executor or mutate stop state directly; they call `ActionGateway`.
 2. **Plan before admission.** Each action declares a kind, capability, risk tier, synthetic/live status, and body-free summary.
 3. **Fail closed.** Unknown capabilities, live executors, writes, and ordinary work while stopped are denied.
-4. **Stop tokens survive reset.** Each stop or reset increments a generation. A token issued before either transition can never become valid again.
+4. **Stop tokens survive reset.** A stop that latches, and every reset, increments a generation. Stopping again while latched changes nothing. A token issued before either transition can never become valid again.
 5. **Receipts, not transcripts.** SQLite stores identifiers, timestamps, policy codes, generation, status, and SHA-256 fingerprints. It has no command, answer, source-body, or free-form log column.
 6. **Offline means offline.** The shipped executor reads only a packaged JSON resource. No HTTP client or provider adapter is part of the runtime dependency set.
 
@@ -26,7 +26,7 @@ Stop enablement is always admissible. Reset is a distinct action with a literal 
 | FastAPI routes | Validation, HTTP status, response models | Executing work or storing bodies |
 | `ActionGateway` | Ordering plan → gate → checkpoints → receipt | Provider-specific logic |
 | `PolicyEngine` | Exact allowlist checks | Duplicating stop state |
-| `StopController` | State, generation, token validation | Persistence or policy |
+| `StopController` (from `switchyard_guard`) | State, generation, token validation | Persistence or policy |
 | `SyntheticExecutor` | Hold an interruptible inspection window, then load the packaged fixture between checkpoints | Network, filesystem writes, subprocesses |
 | `ReceiptStore` | Persist reduced receipt schema | Commands, answers, excerpts, exception text |
 | React console | Visualize server decisions and send controls | Predicting policy locally |

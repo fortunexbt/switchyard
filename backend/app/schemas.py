@@ -30,10 +30,6 @@ class StopState(StrictModel):
     generation: int = Field(ge=0)
 
 
-class StopToken(StrictModel):
-    generation: int = Field(ge=0)
-
-
 class OperatorRequest(StrictModel):
     command: str = Field(min_length=3, max_length=500)
     fixture_id: Literal["orbital-relay-recovery"] = "orbital-relay-recovery"

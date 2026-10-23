@@ -5,9 +5,9 @@ import logging
 from fastapi.testclient import TestClient
 
 from app.config import Settings
-from app.execution import fingerprint
 from app.fixtures import FixtureLibrary
 from app.schemas import OperatorRequest, StopState
+from switchyard_guard import fingerprint
 
 
 COMMAND = "Trace the safest recovery route for the captured orbital relay incident."
