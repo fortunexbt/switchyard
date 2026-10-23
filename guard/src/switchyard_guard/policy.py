@@ -58,19 +58,37 @@ class Decision:
 
 
 class Policy:
-    """Deny by default: a capability runs only if granted, at or below its granted risk."""
+    """Deny by default: a capability runs only if granted, at or below its granted risk, and
+    while its budget (a maximum number of calls, if one is set) has calls left.
 
-    def __init__(self, grants: Mapping[str, Risk | str], rules: Iterable[Rule] = ()) -> None:
+    A budget is a hard limit enforced before the call runs. There is no warning mode: an
+    agent told its budget is spent may call again anyway (see guard/README.md).
+    """
+
+    def __init__(
+        self,
+        grants: Mapping[str, Risk | str],
+        rules: Iterable[Rule] = (),
+        *,
+        budgets: Mapping[str, int] | None = None,
+    ) -> None:
         self._grants = {capability: Risk.parse(risk) for capability, risk in grants.items()}
         self._rules = tuple(rules)
+        self._budgets = dict(budgets or {})
+        if any(limit < 0 for limit in self._budgets.values()):
+            raise ValueError("budgets must be non-negative")
 
-    def evaluate(self, call: Call, *, stopped: bool) -> Decision:
+    def evaluate(self, call: Call, *, stopped: bool, spent: Mapping[str, int] | None = None) -> Decision:
+        """Decide one call. `spent` is how many calls each capability has already been admitted."""
         granted = self._grants.get(call.capability)
         checks = [
             Check("stop.open", not stopped),
             Check("capability.granted", granted is not None),
             Check("risk.within-grant", granted is not None and call.risk <= granted),
         ]
+        limit = self._budgets.get(call.capability)
+        if limit is not None:
+            checks.append(Check("budget.remaining", (spent or {}).get(call.capability, 0) < limit))
         checks += [Check(f"rule.{rule.name}", _passes(rule, call)) for rule in self._rules if rule.applies_to(call)]
         failed = next((check for check in checks if not check.passed), None)
         if failed is None:
@@ -79,6 +97,7 @@ class Policy:
             "stop.open": "denied.stop-active",
             "capability.granted": "denied.capability",
             "risk.within-grant": "denied.risk",
+            "budget.remaining": "denied.budget",
         }.get(failed.code, f"denied.{failed.code}")
         return Decision(False, code, tuple(checks))
 

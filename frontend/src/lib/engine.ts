@@ -1,7 +1,9 @@
-// Browser port of backend/app (policy.py, stop.py, fixtures.py, execution.py).
+// Browser port of backend/app (policy.py, fixtures.py, execution.py).
 // The hosted demo has no server, so the same gate, stop tokens and receipts run
-// here. Fingerprints are byte-compatible with the Python implementation.
+// here. The stop controller and fingerprints come from guard.ts, shared with the
+// Python package.
 import fixture from "../../../backend/app/demo_data/orbital-relay-recovery.json" with { type: "json" };
+import { fingerprint, StopController, Stopped } from "./guard.ts";
 import type {
   ActionResponse,
   ControlResponse,
@@ -33,34 +35,9 @@ const ALLOWED: Record<string, [PlannedAction["capability"], PlannedAction["risk"
   "stop.reset": ["control.reset", "safety_control"],
 };
 
-class StopRequested extends Error {}
-
-function asciiJson(text: string): string {
-  return text.replace(
-    /[\u007f-\uffff]/g,
-    (char) => `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`,
-  );
-}
-
-// json.dumps(sort_keys=True, separators=(",", ":"), ensure_ascii=True)
-export function canonicalJson(value: unknown): string {
-  if (value === null || typeof value !== "object")
-    return asciiJson(JSON.stringify(value));
-  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
-  const record = value as Record<string, unknown>;
-  return `{${Object.keys(record)
-    .sort()
-    .map((key) => `${asciiJson(JSON.stringify(key))}:${canonicalJson(record[key])}`)
-    .join(",")}}`;
-}
-
 async function sha256(text: string): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
-}
-
-export function fingerprint(payload: unknown): Promise<string> {
-  return sha256(canonicalJson(payload));
 }
 
 export function evaluatePolicy(action: PlannedAction, stop: StopState): PolicyDecision {
@@ -89,39 +66,6 @@ export function evaluatePolicy(action: PlannedAction, stop: StopState): PolicyDe
     policy_version: POLICY_VERSION,
     checks,
   };
-}
-
-export class StopController {
-  private enabled = false;
-  private reasonCode: string | null = null;
-  private generation = 0;
-
-  get state(): StopState {
-    return { enabled: this.enabled, reason_code: this.reasonCode, generation: this.generation };
-  }
-
-  snapshot(): number {
-    return this.generation;
-  }
-
-  enable(reasonCode = "operator-stop"): StopState {
-    this.generation += 1;
-    this.enabled = true;
-    this.reasonCode = reasonCode;
-    return this.state;
-  }
-
-  reset(): StopState {
-    this.generation += 1;
-    this.enabled = false;
-    this.reasonCode = null;
-    return this.state;
-  }
-
-  checkpoint(token: number): void {
-    if (this.enabled || token !== this.generation)
-      throw new StopRequested("execution invalidated by stop boundary");
-  }
 }
 
 async function loadFixture(): Promise<{ result: DemoResult; sources: SourceProof[] }> {
@@ -180,6 +124,11 @@ export class Gateway {
     this.inspectionMs = inspectionMs;
   }
 
+  get stopState(): StopState {
+    const { latched, reason, generation } = this.stop.state;
+    return { enabled: latched, reason_code: reason, generation };
+  }
+
   get receipts(): Receipt[] {
     return this.ledger.slice(0, RECEIPT_LIMIT);
   }
@@ -191,23 +140,23 @@ export class Gateway {
     const requestHash = await fingerprint(request);
     const { plan, action } = plannedAction("fixture.replay", requestHash);
     onEvent?.({ stage: "planned", action });
-    const token = this.stop.snapshot();
-    const decision = evaluatePolicy(action, this.stop.state);
+    const token = this.stop.token();
+    const decision = evaluatePolicy(action, this.stopState);
     onEvent?.({ stage: "gated", policy: decision, generation: token });
     if (!decision.allowed) {
-      const status = this.stop.state.enabled ? "stopped" : "blocked";
+      const status = this.stopState.enabled ? "stopped" : "blocked";
       const receipt = this.record(action, decision.code, status, requestHash, null);
       return { plan, policy: decision, result: null, sources: [], receipt };
     }
     try {
-      this.stop.checkpoint(token);
+      this.stop.check(token);
       const { result, sources } = await this.run(token, onEvent);
-      this.stop.checkpoint(token);
+      this.stop.check(token);
       const resultHash = await fingerprint({ result, sources });
       const receipt = this.record(action, decision.code, "completed", requestHash, resultHash);
       return { plan, policy: decision, result, sources, receipt };
     } catch (error) {
-      if (!(error instanceof StopRequested)) {
+      if (!(error instanceof Stopped)) {
         this.record(action, "failed.executor", "failed", requestHash, null);
         throw error;
       }
@@ -225,34 +174,36 @@ export class Gateway {
   async control(kind: "stop.enable" | "stop.reset", request: object): Promise<ControlResponse> {
     const requestHash = await fingerprint(request);
     const { action } = plannedAction(kind, requestHash);
-    const decision = evaluatePolicy(action, this.stop.state);
+    const decision = evaluatePolicy(action, this.stopState);
     if (!decision.allowed) {
       const receipt = this.record(action, decision.code, "blocked", requestHash, null);
-      return { state: this.stop.state, policy: decision, receipt };
+      return { state: this.stopState, policy: decision, receipt };
     }
-    const state = kind === "stop.enable" ? this.stop.enable("operator-stop") : this.stop.reset();
+    if (kind === "stop.enable") this.stop.latch("operator-stop");
+    else this.stop.reset();
+    const state = this.stopState;
     const receipt = this.record(action, decision.code, "completed", requestHash, await fingerprint(state));
     return { state, policy: decision, receipt };
   }
 
   private async run(token: number, onEvent?: (event: RouteEvent) => void) {
-    this.stop.checkpoint(token);
+    this.stop.check(token);
     await pause(0);
-    this.stop.checkpoint(token);
+    this.stop.check(token);
     onEvent?.({ stage: "executing", inspectionMs: this.inspectionMs });
     // Deliberate pacing gives the operator time to exercise stop, as in the backend.
     const deadline = performance.now() + this.inspectionMs;
     let remaining: number;
     while ((remaining = deadline - performance.now()) > 0) {
-      this.stop.checkpoint(token);
+      this.stop.check(token);
       await pause(Math.min(remaining, CHECKPOINT_MS));
-      this.stop.checkpoint(token);
+      this.stop.check(token);
     }
-    this.stop.checkpoint(token);
+    this.stop.check(token);
     const loaded = await loadFixture();
-    this.stop.checkpoint(token);
+    this.stop.check(token);
     await pause(0);
-    this.stop.checkpoint(token);
+    this.stop.check(token);
     return loaded;
   }
 
@@ -270,7 +221,7 @@ export class Gateway {
       action_kind: action.kind,
       capability: action.capability,
       policy_code: policyCode,
-      stop_generation: this.stop.state.generation,
+      stop_generation: this.stop.token(),
       request_fingerprint: requestHash,
       result_fingerprint: resultHash,
       synthetic: action.synthetic,
@@ -318,7 +269,7 @@ export async function handle(
   if (method === "GET" && path === "/api/state") {
     const payload: SystemState = {
       mode: "offline-proof",
-      stop: gateway.stop.state,
+      stop: gateway.stopState,
       capabilities: ["fixtures.read", "control.stop", "control.reset"],
       limitations: LIMITATIONS,
     };

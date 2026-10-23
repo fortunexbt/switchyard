@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { fingerprint } from "../src/lib/guard.ts";
 import {
   evaluatePolicy,
-  fingerprint,
   Gateway,
   handle,
   type RouteEvent,

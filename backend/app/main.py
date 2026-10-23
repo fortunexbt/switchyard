@@ -9,6 +9,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.middleware.trustedhost import TrustedHostMiddleware
+from switchyard_guard import StopController
 
 from .config import Settings, get_settings
 from .execution import ActionGateway
@@ -24,7 +25,6 @@ from .schemas import (
     StateResponse,
     StopRequest,
 )
-from .stop import StopController
 from .storage import ReceiptStore
 
 logger = logging.getLogger("switchyard")
@@ -38,7 +38,7 @@ def create_app(
 ) -> FastAPI:
     runtime = settings or get_settings()
     receipt_store = store or ReceiptStore(runtime.database_url)
-    stop = gateway.stop if gateway is not None else StopController(runtime.initial_stop)
+    stop = gateway.stop if gateway is not None else StopController(latched=runtime.initial_stop)
     action_gateway = gateway or ActionGateway(stop, PolicyEngine(), receipt_store)
 
     @asynccontextmanager
@@ -101,7 +101,7 @@ def create_app(
     @application.get("/api/state", response_model=StateResponse)
     async def state() -> StateResponse:
         return StateResponse(
-            stop=action_gateway.stop.state,
+            stop=action_gateway.stop_state,
             capabilities=["fixtures.read", "control.stop", "control.reset"],
             limitations=[
                 "No network providers or live integrations are implemented.",

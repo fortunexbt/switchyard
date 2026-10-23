@@ -1,17 +1,14 @@
 from __future__ import annotations
 
 import asyncio
-import hashlib
-import json
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
-from enum import Enum
 from math import isfinite
 from time import monotonic
-from typing import Any, Literal
+from typing import Literal
 from uuid import uuid4
 
-from pydantic import BaseModel
+from switchyard_guard import StopController, Stopped, fingerprint
 
 from .fixtures import FixtureLibrary
 from .policy import PolicyEngine
@@ -29,33 +26,8 @@ from .schemas import (
     RiskTier,
     StopRequest,
     StopState,
-    StopToken,
 )
-from .stop import StopController, StopRequested
 from .storage import ReceiptStore
-
-
-def fingerprint(payload: Any) -> str:
-    if hasattr(payload, "model_dump"):
-        payload = payload.model_dump(mode="json")
-    canonical = json.dumps(
-        payload,
-        sort_keys=True,
-        separators=(",", ":"),
-        ensure_ascii=True,
-        default=_json_default,
-    )
-    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
-
-
-def _json_default(value: Any) -> Any:
-    if isinstance(value, BaseModel):
-        return value.model_dump(mode="json")
-    if isinstance(value, datetime):
-        return value.isoformat()
-    if isinstance(value, Enum):
-        return value.value
-    raise TypeError(f"Unsupported fingerprint value: {type(value).__name__}")
 
 
 class Planner:
@@ -113,27 +85,27 @@ class SyntheticExecutor:
         self._checkpoint_hook = checkpoint_hook
         self._inspection_seconds = inspection_seconds
 
-    async def run(self, fixture_id: str, token: StopToken):
-        self._stop.checkpoint(token)
+    async def run(self, fixture_id: str, token: int):
+        self._stop.check(token)
         await asyncio.sleep(0)
-        self._stop.checkpoint(token)
+        self._stop.check(token)
         if self._checkpoint_hook is not None:
             await self._checkpoint_hook()
-            self._stop.checkpoint(token)
+            self._stop.check(token)
 
         # Deliberate synthetic pacing gives the operator time to exercise stop.
         # It represents no provider work or per-stage progress.
         deadline = monotonic() + self._inspection_seconds
         while (remaining := deadline - monotonic()) > 0:
-            self._stop.checkpoint(token)
+            self._stop.check(token)
             await asyncio.sleep(min(remaining, 0.1))
-            self._stop.checkpoint(token)
+            self._stop.check(token)
 
-        self._stop.checkpoint(token)
+        self._stop.check(token)
         result, sources = self._fixtures.load(fixture_id)
-        self._stop.checkpoint(token)
+        self._stop.check(token)
         await asyncio.sleep(0)
-        self._stop.checkpoint(token)
+        self._stop.check(token)
         return result, sources
 
 
@@ -153,23 +125,28 @@ class ActionGateway:
         self.executor = executor or SyntheticExecutor(stop)
         self.planner = Planner()
 
+    @property
+    def stop_state(self) -> StopState:
+        state = self.stop.state
+        return StopState(enabled=state.latched, reason_code=state.reason, generation=state.generation)
+
     async def execute(self, request: OperatorRequest) -> ActionResponse:
         request_hash = fingerprint(request)
         plan = self.planner.fixture_plan(request_hash)
         action = plan.actions[0]
-        token = self.stop.snapshot()
-        decision = self.policy.evaluate(action, self.stop.state)
+        token = self.stop.token()
+        decision = self.policy.evaluate(action, self.stop_state)
         if not decision.allowed:
-            status = ReceiptStatus.STOPPED if self.stop.state.enabled else ReceiptStatus.BLOCKED
+            status = ReceiptStatus.STOPPED if self.stop_state.enabled else ReceiptStatus.BLOCKED
             receipt = self._receipt(action, decision.code, status, request_hash, None)
             self.store.append(receipt)
             return ActionResponse(plan=plan, policy=decision, receipt=receipt)
 
         try:
-            self.stop.checkpoint(token)
+            self.stop.check(token)
             result, sources = await self.executor.run(request.fixture_id, token)
-            self.stop.checkpoint(token)
-        except StopRequested:
+            self.stop.check(token)
+        except Stopped:
             decision = PolicyDecision(
                 allowed=False,
                 code="denied.stop-during-execution",
@@ -216,12 +193,13 @@ class ActionGateway:
         request_hash = fingerprint(request)
         plan = self.planner.control_plan("stop.enable", request_hash)
         action = plan.actions[0]
-        decision = self.policy.evaluate(action, self.stop.state)
+        decision = self.policy.evaluate(action, self.stop_state)
         if not decision.allowed:  # Defensive: stop.enable is deliberately always admissible.
             receipt = self._receipt(action, decision.code, ReceiptStatus.BLOCKED, request_hash, None)
             self.store.append(receipt)
-            return ControlResponse(state=self.stop.state, policy=decision, receipt=receipt)
-        state = self.stop.enable("operator-stop")
+            return ControlResponse(state=self.stop_state, policy=decision, receipt=receipt)
+        self.stop.latch("operator-stop")
+        state = self.stop_state
         receipt = self._receipt(
             action,
             decision.code,
@@ -236,12 +214,13 @@ class ActionGateway:
         request_hash = fingerprint(request)
         plan = self.planner.control_plan("stop.reset", request_hash)
         action = plan.actions[0]
-        decision = self.policy.evaluate(action, self.stop.state)
+        decision = self.policy.evaluate(action, self.stop_state)
         if not decision.allowed:
             receipt = self._receipt(action, decision.code, ReceiptStatus.BLOCKED, request_hash, None)
             self.store.append(receipt)
-            return ControlResponse(state=self.stop.state, policy=decision, receipt=receipt)
-        state = self.stop.reset()
+            return ControlResponse(state=self.stop_state, policy=decision, receipt=receipt)
+        self.stop.reset()
+        state = self.stop_state
         receipt = self._receipt(
             action,
             decision.code,
@@ -252,7 +231,7 @@ class ActionGateway:
         try:
             self.store.append(receipt)
         except Exception:
-            self.stop.enable("receipt-persistence-failure")
+            self.stop.latch("receipt-persistence-failure")
             raise
         return ControlResponse(state=state, policy=decision, receipt=receipt)
 
@@ -271,7 +250,7 @@ class ActionGateway:
             action_kind=action.kind,
             capability=action.capability,
             policy_code=policy_code,
-            stop_generation=self.stop.state.generation,
+            stop_generation=self.stop.token(),
             request_fingerprint=request_hash,
             result_fingerprint=result_hash,
             synthetic=action.synthetic,

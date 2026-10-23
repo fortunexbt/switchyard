@@ -8,6 +8,8 @@
 **/*.pyc
 **/*.db
 backend/tests
+guard/tests
+**/*.egg-info
 frontend/node_modules
 frontend/dist
 npm-debug.log*

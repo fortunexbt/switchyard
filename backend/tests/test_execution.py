@@ -6,12 +6,12 @@ from pathlib import Path
 import pytest
 
 from app import execution
-from app.execution import ActionGateway, SyntheticExecutor, fingerprint
+from app.execution import ActionGateway, SyntheticExecutor
 from app.fixtures import FixtureLibrary
 from app.policy import PolicyEngine
-from app.schemas import OperatorRequest, PlannedAction, ResetStopRequest, RiskTier, StopRequest
-from app.stop import StopController, StopRequested
+from app.schemas import OperatorRequest, PlannedAction, ResetStopRequest, RiskTier, StopRequest, StopState
 from app.storage import ReceiptStore
+from switchyard_guard import StopController, Stopped, fingerprint
 
 
 @pytest.mark.asyncio
@@ -53,7 +53,7 @@ async def test_default_inspection_window_stops_before_fixture_load(
         await gateway.enable_stop(StopRequest(reason="test-stop"))
         if reset_before_resume:
             await gateway.reset_stop(ResetStopRequest(acknowledge="resume synthetic execution"))
-            assert stop.state.enabled is False
+            assert stop.state.latched is False
         release.set()
         outcome = await asyncio.wait_for(task, timeout=1)
 
@@ -131,7 +131,7 @@ async def test_stop_invalidates_in_flight_action(tmp_path: Path) -> None:
 
     task = asyncio.create_task(gateway.execute(OperatorRequest(command="Replay the relay fixture.")))
     await asyncio.wait_for(started.wait(), timeout=1)
-    stop.enable("test-stop")
+    stop.latch("test-stop")
     release.set()
     outcome = await asyncio.wait_for(task, timeout=1)
 
@@ -143,16 +143,16 @@ async def test_stop_invalidates_in_flight_action(tmp_path: Path) -> None:
 
 def test_old_token_stays_invalid_after_stop_reset() -> None:
     stop = StopController()
-    old_token = stop.snapshot()
-    stop.enable("test-stop")
+    old_token = stop.token()
+    stop.latch("test-stop")
     stop.reset()
-    with pytest.raises(StopRequested):
-        stop.checkpoint(old_token)
+    with pytest.raises(Stopped):
+        stop.check(old_token)
 
 
 def test_policy_denies_live_and_write_paths() -> None:
     policy = PolicyEngine()
-    stop = StopController().state
+    stop = StopState(enabled=False, generation=0)
     live = PlannedAction(
         action_id="live",
         kind="fixture.replay",

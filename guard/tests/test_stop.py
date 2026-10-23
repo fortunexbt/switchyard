@@ -303,3 +303,28 @@ def test_a_tool_that_swallows_the_cancel_still_has_its_result_withheld() -> None
         assert asyncio.current_task().cancelling() == 0  # type: ignore[union-attr]
 
     asyncio.run(scenario())
+
+
+def test_a_stop_between_admission_and_tracking_still_halts_the_async_call() -> None:
+    # Found by the property test: a latch here saw no task to cancel and the call hung.
+    async def scenario() -> None:
+        guard = make_guard()
+        track = guard._track
+
+        def latch_then_track(task, token):  # type: ignore[no-untyped-def]
+            guard.stop()
+            track(task, token)
+
+        guard._track = latch_then_track  # type: ignore[method-assign]
+
+        @guard.gated("job.run", "write")
+        async def hang() -> None:
+            await asyncio.Event().wait()
+
+        with pytest.raises(Stopped) as stopped:
+            async with asyncio.timeout(1):
+                await hang()
+        assert stopped.value.receipt.code == "stopped.before-start"
+        assert asyncio.current_task().cancelling() == 0  # type: ignore[union-attr]
+
+    asyncio.run(scenario())

@@ -9,7 +9,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 COPY backend/requirements.txt /app/requirements.txt
-RUN python -m pip install --no-cache-dir -r /app/requirements.txt \
+COPY guard /tmp/guard
+RUN python -m pip install --no-cache-dir -r /app/requirements.txt /tmp/guard \
+    && rm -rf /tmp/guard \
     && addgroup --system --gid 10001 switchyard \
     && adduser --system --uid 10001 --ingroup switchyard switchyard \
     && mkdir -p /data \

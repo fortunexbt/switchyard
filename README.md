@@ -19,11 +19,11 @@ def read_file(path: str) -> str:
     return open(path).read()
 ```
 
-Calls to ungranted capabilities raise `Denied` before the function runs, `guard.stop()` ends running calls at their next checkpoint or await, and each call writes a receipt with argument and result fingerprints only. See [guard/README.md](guard/README.md) for rules over real arguments, async cancellation, the SQLite ledger and three runnable examples.
+Calls to ungranted capabilities raise `Denied` before the function runs, `guard.stop()` ends running calls at their next checkpoint or await, and each call writes a receipt with argument and result fingerprints only. Budgets are hard limits checked before the call runs. See [guard/README.md](guard/README.md) for rules over real arguments, budgets, async cancellation, the five guarantees and the property tests that try to break them, the SQLite ledger and three runnable examples.
 
 ## The console
 
-Switchyard replays one versioned incident fixture, an orbital relay recovery drill, through a deny-by-default gate. The replay is paced on purpose so you can stop it. A completed run releases the captured evidence. A stopped run releases nothing except its receipt. Reset needs an explicit acknowledgement and is recorded too.
+Switchyard replays one versioned incident fixture, an orbital relay recovery drill, through a deny-by-default gate. The replay is paced on purpose so you can stop it. A completed run releases the drill's evidence. A stopped run releases nothing except its receipt. Reset needs an explicit acknowledgement and is recorded too.
 
 It is an offline proof, not an assistant with imaginary integrations:
 
@@ -53,11 +53,11 @@ flowchart LR
     R --> D[(SQLite metadata only)]
 ```
 
-Every execution and control mutation enters `ActionGateway`. A stop increments a generation counter, and the executor checks its token against it at every checkpoint, so a run already past the gate is still held. Read-only health, state and receipt endpoints do not create receipts. The optional receipt annotation changes the request fingerprint, not the fixture result.
+Every execution and control mutation enters `ActionGateway`. A stop that latches increments a generation counter, and the executor checks its token against it at every checkpoint, so a run already past the gate is still held. Read-only health, state and receipt endpoints do not create receipts. The optional receipt annotation changes the request fingerprint, not the fixture result.
 
 ### The hosted demo
 
-The Vercel build sets `VITE_DEMO_MODE=true`. The console then talks to `frontend/src/lib/engine.ts`, a TypeScript port of the policy gate, stop controller, paced executor and receipt ledger, instead of the FastAPI server. Both read the same fixture file, and fingerprints match the Python implementation byte for byte; the frontend and backend suites assert the same golden hashes. In this mode the route shows each stage live with browser-clock timings, and the replay window marks the checkpoint where a stop held the run.
+The Vercel build sets `VITE_DEMO_MODE=true`. The console then talks to `frontend/src/lib/engine.ts`, a TypeScript port of the console's gateway, paced executor and receipt ledger, instead of the FastAPI server. Its stop controller and fingerprints come from `frontend/src/lib/guard.ts`, the TypeScript port of `guard/`. Both sides read the same fixture file, and the frontend and backend suites assert the same golden hashes. In this mode the route shows each stage live with browser-clock timings, and the replay window marks the checkpoint where a stop held the run.
 
 Limits of the demo: receipts live in the browser tab and clear on reload, there is no SQLite store, and nothing leaves the page. Run it locally for the full control plane.
 
@@ -67,7 +67,7 @@ Requirements: Python 3.12+, Node.js 24+, and npm 10+.
 
 ```bash
 python -m venv .venv
-.venv/bin/python -m pip install -r backend/requirements-dev.txt -e guard
+.venv/bin/python -m pip install -r backend/requirements-dev.txt -e "guard[test]"
 cd frontend && npm ci && cd ..
 ```
 
@@ -116,10 +116,10 @@ The server binds to `127.0.0.1` by default. CORS is an exact, non-credentialed l
 
 ## Project map
 
-- `guard/`: the `switchyard-guard` package, its tests and examples
+- `guard/`: the `switchyard-guard` package (stop controller, gate, budgets, receipts), its tests, examples and shared goldens
+- `frontend/src/lib/guard.ts`: the TypeScript port of `guard/`
 - `backend/app/execution.py`: the only execution/control mutation boundary
 - `backend/app/policy.py`: compact policy allowlist
-- `backend/app/stop.py`: generation-token stop controller
 - `backend/app/storage.py`: metadata-only receipt store
 - `backend/app/demo_data/`: versioned deterministic evidence
 - `frontend/`: responsive React dispatch console
