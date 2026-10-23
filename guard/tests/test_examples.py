@@ -36,7 +36,8 @@ def test_the_readme_quickstart_does_what_the_readme_says(tmp_path: Path, monkeyp
     from switchyard_guard import Denied, Stopped
 
     readme = (EXAMPLES.parent / "README.md").read_text(encoding="utf-8")
-    code = re.findall(r"```python\n(.*?)```", readme, re.S)[0]
+    quickstart, side_effects = re.findall(r"```python\n(.*?)```", readme, re.S)[:2]
+    code = quickstart + side_effects
     (tmp_path / "workspace" / "a").mkdir(parents=True)
     (tmp_path / "workspace" / "a" / "one").write_text("1")
     monkeypatch.chdir(tmp_path)
@@ -64,4 +65,6 @@ def test_the_readme_quickstart_does_what_the_readme_says(tmp_path: Path, monkeyp
         assert stopped.receipt.code == "denied.stop-active"
     ns["guard"].reset()
     assert ns["index_tree"]("a") == 1
+    assert ns["append_lines"]("a/log.txt", ["one", "two"]) == 2
+    assert (tmp_path / "workspace" / "a" / "log.txt").read_text() == "one\ntwo\n"
     ns["guard"].ledger.close()

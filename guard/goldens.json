@@ -1,0 +1,507 @@
+{
+  "about": "Generated from the Python package. guard/tests/test_goldens.py and frontend/tests/guard.test.ts check both implementations against these values.",
+  "hmac_key": "switchyard-golden-key",
+  "fingerprints": [
+    {
+      "name": "console request",
+      "value": {
+        "command": "Trace the safest recovery route for the captured orbital relay incident.",
+        "fixture_id": "orbital-relay-recovery"
+      },
+      "canonical": "{\"command\":\"Trace the safest recovery route for the captured orbital relay incident.\",\"fixture_id\":\"orbital-relay-recovery\"}",
+      "sha256": "a5a993fb32cc5363c25005e7c2896151f31a1dfc88cfb2c551cef982559235a3",
+      "hmac_sha256": "3d27216a5f8d6bcb52df0313850b3936e22dc0ba1277d221df95de01e45ef1c2"
+    },
+    {
+      "name": "stop state",
+      "value": {
+        "enabled": true,
+        "reason_code": "operator-stop",
+        "generation": 1
+      },
+      "canonical": "{\"enabled\":true,\"generation\":1,\"reason_code\":\"operator-stop\"}",
+      "sha256": "b2d06d67ec5fa59585e6911b2e966f9210e940b839c687246136f3c32312b428",
+      "hmac_sha256": "72f2dd857ae22ec276709062c8a19c686cc1cfc98b97aae91076ddd23b1e61b6"
+    },
+    {
+      "name": "tool arguments",
+      "value": {
+        "path": "notes/plan.md",
+        "text": "rotate the staging key on Friday\n",
+        "limit": 10,
+        "recursive": false,
+        "tags": null
+      },
+      "canonical": "{\"limit\":10,\"path\":\"notes/plan.md\",\"recursive\":false,\"tags\":null,\"text\":\"rotate the staging key on Friday\\n\"}",
+      "sha256": "e61d466e81fb62bc02b790f03372e4926b22eb916f27d8921ec438596a1e5d9c",
+      "hmac_sha256": "f9ec42d5934d7e1c41ce9f5dac2a018652cc473084274f5777b7057105d29867"
+    },
+    {
+      "name": "unicode strings",
+      "value": {
+        "command": "Relay 07 \u2014 drift \u00fc \ud83d\udef0 \u007f\n\"q\"",
+        "lone": "\ud800",
+        "controls": "\u0000\u001f\t\r\b\f",
+        "html": "</script>&<"
+      },
+      "canonical": "{\"command\":\"Relay 07 \\u2014 drift \\u00fc \\ud83d\\udef0 \\u007f\\n\\\"q\\\"\",\"controls\":\"\\u0000\\u001f\\t\\r\\b\\f\",\"html\":\"</script>&<\",\"lone\":\"\\ud800\"}",
+      "sha256": "58f031654ff407368b04fb1ebf4429014ecb0c713a5a36e56d5240f30c2906f9",
+      "hmac_sha256": "70d8cef254e9166188841fcb2296d39064efb896eb9d1cd2d6d964071c3fc363"
+    },
+    {
+      "name": "key order by utf-16",
+      "value": {
+        "\uffff": 1,
+        "\ud83d\ude00": 2,
+        "z": 3,
+        "Z": 4,
+        "\u00e9": 5,
+        "": 6,
+        "10": 7,
+        "9": 8
+      },
+      "canonical": "{\"\":6,\"10\":7,\"9\":8,\"Z\":4,\"z\":3,\"\\u00e9\":5,\"\\ud83d\\ude00\":2,\"\\uffff\":1}",
+      "sha256": "5f3dc861ef373eeae0e2f737774549dc28dab69bd227ae1d70cb13aa465c5839",
+      "hmac_sha256": "898dc1e3c862df32cc37ba1000ecd43e204776f1d3cabcef91cf507b5c401b2f"
+    },
+    {
+      "name": "floats",
+      "value": [
+        0.0,
+        -0.0,
+        1.0,
+        -1.5,
+        0.1,
+        1e+21,
+        1e+20,
+        1.2345678901234568e+20,
+        1e-06,
+        1e-07,
+        1.5e-07,
+        5e-324,
+        1.7976931348623157e+308,
+        123.456,
+        100.0,
+        2.5e-10
+      ],
+      "canonical": "[0,0,1,-1.5,0.1,1e+21,100000000000000000000,123456789012345680000,0.000001,1e-7,1.5e-7,5e-324,1.7976931348623157e+308,123.456,100,2.5e-10]",
+      "sha256": "75a5d5ddcb4ceb77b8d770e276e94a5390a4a50274a9cd3827bd3c8b26c4adfb",
+      "hmac_sha256": "101ee8c1f1c17ad489bd9aa2f28eaf07ae39d64ca54bcaebfa28921ca687bd05"
+    },
+    {
+      "name": "integers",
+      "value": [
+        0,
+        -1,
+        9007199254740991,
+        -9007199254740991,
+        1000000
+      ],
+      "canonical": "[0,-1,9007199254740991,-9007199254740991,1000000]",
+      "sha256": "a9efae7a9cae93c5e18baa0c90679ff1c4daa48b28da1ab753c4f80dcdd4e24a",
+      "hmac_sha256": "17d7eb32b786f2d4fb5477dabfd852f44fde73d25563f9bf40394bc0357b0c39"
+    },
+    {
+      "name": "nested",
+      "value": {
+        "a": [
+          {
+            "b": [],
+            "c": {}
+          },
+          [
+            []
+          ],
+          {
+            "d": [
+              null,
+              true,
+              false
+            ]
+          }
+        ]
+      },
+      "canonical": "{\"a\":[{\"b\":[],\"c\":{}},[[]],{\"d\":[null,true,false]}]}",
+      "sha256": "27bc5a41d907f847151d2d7471dff9d2090b52cf410bb717b8cca14a1f2ce027",
+      "hmac_sha256": "47b066d940d248eaf9a8ffb7820516d587a394b75606c3cb986d1f2286eafde9"
+    },
+    {
+      "name": "empty object",
+      "value": {},
+      "canonical": "{}",
+      "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "hmac_sha256": "75f9497ccb3acceb29e15cf980853bd3b3a5d7c947903ee03b873e169d4d6f73"
+    },
+    {
+      "name": "empty string",
+      "value": "",
+      "canonical": "\"\"",
+      "sha256": "12ae32cb1ec02d01eda3581b127c1fee3b0dc53572ed6baf239721a03d82e126",
+      "hmac_sha256": "05180d6516450810f48dfd61c6afb16f2f03d0185cc9cb67a59af95811c17d92"
+    },
+    {
+      "name": "number",
+      "value": 42,
+      "canonical": "42",
+      "sha256": "73475cb40a568e8da8a045ced110137e159f890ac4da883b6b17dc651b3a8049",
+      "hmac_sha256": "9c403d0d6e2c73c7ad0409633d362ab48c5fcef7cb0a740f09e14f0d660e0fcc"
+    }
+  ],
+  "policy": {
+    "grants": {
+      "fs.read": "read",
+      "fs.write": "write",
+      "admin": "destructive"
+    },
+    "budgets": {
+      "fs.write": 2,
+      "admin": 0
+    },
+    "cases": [
+      {
+        "capability": "fs.read",
+        "risk": "read",
+        "stopped": false,
+        "spent": {},
+        "allowed": true,
+        "code": "allowed",
+        "checks": [
+          [
+            "stop.open",
+            true
+          ],
+          [
+            "capability.granted",
+            true
+          ],
+          [
+            "risk.within-grant",
+            true
+          ]
+        ]
+      },
+      {
+        "capability": "fs.read",
+        "risk": "write",
+        "stopped": false,
+        "spent": {},
+        "allowed": false,
+        "code": "denied.risk",
+        "checks": [
+          [
+            "stop.open",
+            true
+          ],
+          [
+            "capability.granted",
+            true
+          ],
+          [
+            "risk.within-grant",
+            false
+          ]
+        ]
+      },
+      {
+        "capability": "fs.write",
+        "risk": "write",
+        "stopped": false,
+        "spent": {},
+        "allowed": true,
+        "code": "allowed",
+        "checks": [
+          [
+            "stop.open",
+            true
+          ],
+          [
+            "capability.granted",
+            true
+          ],
+          [
+            "risk.within-grant",
+            true
+          ],
+          [
+            "budget.remaining",
+            true
+          ]
+        ]
+      },
+      {
+        "capability": "fs.write",
+        "risk": "write",
+        "stopped": false,
+        "spent": {
+          "fs.write": 1
+        },
+        "allowed": true,
+        "code": "allowed",
+        "checks": [
+          [
+            "stop.open",
+            true
+          ],
+          [
+            "capability.granted",
+            true
+          ],
+          [
+            "risk.within-grant",
+            true
+          ],
+          [
+            "budget.remaining",
+            true
+          ]
+        ]
+      },
+      {
+        "capability": "fs.write",
+        "risk": "write",
+        "stopped": false,
+        "spent": {
+          "fs.write": 2
+        },
+        "allowed": false,
+        "code": "denied.budget",
+        "checks": [
+          [
+            "stop.open",
+            true
+          ],
+          [
+            "capability.granted",
+            true
+          ],
+          [
+            "risk.within-grant",
+            true
+          ],
+          [
+            "budget.remaining",
+            false
+          ]
+        ]
+      },
+      {
+        "capability": "fs.write",
+        "risk": "write",
+        "stopped": true,
+        "spent": {
+          "fs.write": 2
+        },
+        "allowed": false,
+        "code": "denied.stop-active",
+        "checks": [
+          [
+            "stop.open",
+            false
+          ],
+          [
+            "capability.granted",
+            true
+          ],
+          [
+            "risk.within-grant",
+            true
+          ],
+          [
+            "budget.remaining",
+            false
+          ]
+        ]
+      },
+      {
+        "capability": "fs.write",
+        "risk": "destructive",
+        "stopped": false,
+        "spent": {
+          "fs.write": 5
+        },
+        "allowed": false,
+        "code": "denied.risk",
+        "checks": [
+          [
+            "stop.open",
+            true
+          ],
+          [
+            "capability.granted",
+            true
+          ],
+          [
+            "risk.within-grant",
+            false
+          ],
+          [
+            "budget.remaining",
+            false
+          ]
+        ]
+      },
+      {
+        "capability": "fs.delete",
+        "risk": "destructive",
+        "stopped": false,
+        "spent": {},
+        "allowed": false,
+        "code": "denied.capability",
+        "checks": [
+          [
+            "stop.open",
+            true
+          ],
+          [
+            "capability.granted",
+            false
+          ],
+          [
+            "risk.within-grant",
+            false
+          ]
+        ]
+      },
+      {
+        "capability": "admin",
+        "risk": "read",
+        "stopped": false,
+        "spent": {},
+        "allowed": false,
+        "code": "denied.budget",
+        "checks": [
+          [
+            "stop.open",
+            true
+          ],
+          [
+            "capability.granted",
+            true
+          ],
+          [
+            "risk.within-grant",
+            true
+          ],
+          [
+            "budget.remaining",
+            false
+          ]
+        ]
+      },
+      {
+        "capability": "fs.read",
+        "risk": "read",
+        "stopped": true,
+        "spent": {
+          "fs.read": 100
+        },
+        "allowed": false,
+        "code": "denied.stop-active",
+        "checks": [
+          [
+            "stop.open",
+            false
+          ],
+          [
+            "capability.granted",
+            true
+          ],
+          [
+            "risk.within-grant",
+            true
+          ]
+        ]
+      },
+      {
+        "capability": "fs.delete",
+        "risk": "write",
+        "stopped": true,
+        "spent": {},
+        "allowed": false,
+        "code": "denied.stop-active",
+        "checks": [
+          [
+            "stop.open",
+            false
+          ],
+          [
+            "capability.granted",
+            false
+          ],
+          [
+            "risk.within-grant",
+            false
+          ]
+        ]
+      }
+    ]
+  },
+  "stop": [
+    {
+      "op": "latch:operator-stop",
+      "changed": true,
+      "state": {
+        "latched": true,
+        "reason": "operator-stop",
+        "generation": 1
+      },
+      "first_token_valid": false,
+      "fresh_token_valid": false
+    },
+    {
+      "op": "latch:pressed-again",
+      "changed": false,
+      "state": {
+        "latched": true,
+        "reason": "operator-stop",
+        "generation": 1
+      },
+      "first_token_valid": false,
+      "fresh_token_valid": false
+    },
+    {
+      "op": "reset",
+      "changed": true,
+      "state": {
+        "latched": false,
+        "reason": null,
+        "generation": 2
+      },
+      "first_token_valid": false,
+      "fresh_token_valid": true
+    },
+    {
+      "op": "reset",
+      "changed": true,
+      "state": {
+        "latched": false,
+        "reason": null,
+        "generation": 3
+      },
+      "first_token_valid": false,
+      "fresh_token_valid": true
+    },
+    {
+      "op": "latch:second",
+      "changed": true,
+      "state": {
+        "latched": true,
+        "reason": "second",
+        "generation": 4
+      },
+      "first_token_valid": false,
+      "fresh_token_valid": false
+    },
+    {
+      "op": "reset",
+      "changed": true,
+      "state": {
+        "latched": false,
+        "reason": null,
+        "generation": 5
+      },
+      "first_token_valid": false,
+      "fresh_token_valid": true
+    }
+  ]
+}
