@@ -161,7 +161,11 @@ function App() {
       </header>
 
       <main className="console">
-        <section className="panel run" id="run" aria-labelledby="run-title">
+        <section
+          className={`panel run ${phase === "stopped" ? "halted" : ""}`}
+          id="run"
+          aria-labelledby="run-title"
+        >
           <div className="run-head">
             <div className="run-heading">
               <h2 id="run-title">Orbital relay recovery</h2>
@@ -174,6 +178,16 @@ function App() {
               </p>
             </div>
             <div className="run-actions">
+              {latched && !running && (
+                <button
+                  className="button"
+                  onClick={() => setConfirmReset(true)}
+                  disabled={controlBusy}
+                >
+                  <Icon name="reset" />
+                  Reset
+                </button>
+              )}
               <button
                 className="button primary"
                 type="submit"
@@ -183,27 +197,16 @@ function App() {
                 <Icon name="play" />
                 Replay
               </button>
-              {latched && !running ? (
-                <button
-                  key="reset"
-                  className="button"
-                  onClick={() => setConfirmReset(true)}
-                  disabled={controlBusy}
-                >
-                  <Icon name="reset" />
-                  Reset
-                </button>
-              ) : (
-                <button
-                  key="stop"
-                  className={`button stop ${running ? "armed" : ""}`}
-                  onClick={() => void plane.stopNow()}
-                  disabled={controlBusy || latched}
-                >
-                  <Icon name="stop" />
-                  {stopping ? "Stopping" : "Stop"}
-                </button>
-              )}
+              <button
+                className={`plunger ${running ? "armed" : ""} ${stopping ? "pressed" : ""} ${latched && !running ? "latched" : ""}`}
+                onClick={() => void plane.stopNow()}
+                disabled={controlBusy || latched}
+              >
+                <span className="plunger-cap" aria-hidden="true" />
+                <span className="plunger-label">
+                  {stopping ? "Stopping" : latched ? "Latched" : "Stop"}
+                </span>
+              </button>
             </div>
           </div>
 
@@ -222,42 +225,40 @@ function App() {
             </div>
           )}
 
+          <form
+            id="instruction-form"
+            className="instruction"
+            onSubmit={dispatch}
+          >
+            <label htmlFor="instruction">Instruction</label>
+            <input
+              id="instruction"
+              value={command}
+              onChange={(event) => setCommand(event.target.value)}
+              maxLength={500}
+              disabled={busy}
+              spellCheck={false}
+              autoComplete="off"
+              aria-describedby="instruction-hint"
+              aria-invalid={command.trim().length < 3}
+            />
+            <p
+              id="instruction-hint"
+              className={command.trim().length < 3 ? "invalid" : ""}
+            >
+              {command.trim().length < 3
+                ? "Enter at least 3 characters."
+                : "Only a hash of this text is kept. The replay is the same whatever you type."}
+            </p>
+          </form>
+
           <Route
             run={phase === "idle" ? null : run}
             phase={phase}
             outcome={outcome}
             replayStage={replayStage}
             onShowReceipt={showReceipt}
-          >
-            <form
-              id="instruction-form"
-              className="instruction"
-              onSubmit={dispatch}
-            >
-              <label className="visually-hidden" htmlFor="instruction">
-                Instruction
-              </label>
-              <input
-                id="instruction"
-                value={command}
-                onChange={(event) => setCommand(event.target.value)}
-                maxLength={500}
-                disabled={busy}
-                spellCheck={false}
-                autoComplete="off"
-                aria-describedby="instruction-hint"
-                aria-invalid={command.trim().length < 3}
-              />
-              <p
-                id="instruction-hint"
-                className={command.trim().length < 3 ? "invalid" : ""}
-              >
-                {command.trim().length < 3
-                  ? "Enter at least 3 characters."
-                  : "Only a hash of this text is kept. The replay is the same whatever you type."}
-              </p>
-            </form>
-          </Route>
+          />
 
           {outcome && <Release outcome={outcome} />}
 
@@ -363,14 +364,12 @@ function Route({
   outcome,
   replayStage,
   onShowReceipt,
-  children,
 }: {
   run: RunTrace | null;
   phase: Phase;
   outcome: ActionResponse | null;
   replayStage: RefObject<HTMLLIElement | null>;
   onShowReceipt: (id: string) => void;
-  children: ReactNode;
 }) {
   const idle = phase === "idle";
   const planned = mark(run, "planned");
@@ -412,17 +411,23 @@ function Route({
           : outcome
             ? "skipped"
             : "idle";
+  const replay = useReplay(
+    executing?.inspectionMs ?? INSPECTION_MS,
+    executing?.at ?? null,
+    run?.settledAt ?? null,
+    fixture,
+  );
 
   return (
     <ol className="route" aria-label="Route">
       <Stage
+        kind="entry"
         state={instruction}
         title="Instruction"
         label={idle ? "Not sent" : action ? "Planned" : "Submitted"}
         at={since(run, planned?.at)}
       >
-        {children}
-        {action && (
+        {action ? (
           <dl className="facts">
             <div>
               <dt>Action</dt>
@@ -449,9 +454,12 @@ function Route({
               </dd>
             </div>
           </dl>
+        ) : (
+          <p>Planned into one fixture action when you press Replay.</p>
         )}
       </Stage>
       <Stage
+        kind="gate"
         state={gate}
         title="Policy gate"
         label={
@@ -515,6 +523,7 @@ function Route({
         )}
       </Stage>
       <Stage
+        kind="track"
         state={fixture}
         title="Fixture replay"
         label={
@@ -531,25 +540,24 @@ function Route({
                     : "Waiting"
         }
         at={since(run, executing?.at)}
+        rail={<Checkpoints replay={replay} />}
         stageRef={replayStage}
       >
-        <ReplayWindow
-          windowMs={executing?.inspectionMs ?? INSPECTION_MS}
-          startedAt={executing?.at ?? null}
+        <ReplayReadout
+          replay={replay}
           stopAt={run?.stopAt ?? null}
-          endedAt={run?.settledAt ?? null}
-          state={fixture}
           remote={phase === "pending"}
         />
       </Stage>
       <Stage
+        kind="buffer"
         state={outcome ? "done" : "idle"}
         title="Receipt"
         label={outcome ? "Recorded" : "Pending"}
         at={since(run, outcome ? run?.settledAt : null)}
       >
         {outcome ? (
-          <p className="receipt-line">
+          <div className="receipt-line">
             <code>{outcome.receipt.receipt_id}</code>
             <Badge tone={STATUS_TONE[outcome.receipt.status]}>
               {outcome.receipt.status}
@@ -560,7 +568,7 @@ function Route({
             >
               Show in ledger
             </button>
-          </p>
+          </div>
         ) : (
           <p>Written when the run ends, including a stopped run.</p>
         )}
@@ -579,56 +587,52 @@ function reducedMotion() {
 }
 
 function Stage({
+  kind,
   state,
   title,
   label,
   at,
+  rail,
   stageRef,
   children,
 }: {
+  kind: "entry" | "gate" | "track" | "buffer";
   state: StageState;
   title: string;
   label: string;
   at: string | null;
+  rail?: ReactNode;
   stageRef?: RefObject<HTMLLIElement | null>;
   children: ReactNode;
 }) {
   return (
-    <li className={`stage ${state}`} ref={stageRef}>
-      <span className="stage-mark" aria-hidden="true">
-        {state === "done" ? (
-          <Icon name="check" />
-        ) : state === "held" ? (
-          <Icon name="stop" />
-        ) : null}
-      </span>
-      <div className="stage-body">
-        <div className="stage-head">
-          <h3>{title}</h3>
-          <span className="stage-state">{label}</span>
-          {at && <span className="stage-time">{at}</span>}
-        </div>
-        {children}
+    <li className={`stage ${kind} ${state}`} ref={stageRef}>
+      <div className="stage-rail">
+        <span className="stage-mark" aria-hidden="true">
+          {state === "done" ? (
+            <Icon name="check" />
+          ) : state === "held" ? (
+            <Icon name="stop" />
+          ) : null}
+        </span>
+        {rail}
+        {at && <span className="stage-time">{at}</span>}
       </div>
+      <div className="stage-head">
+        <h3>{title}</h3>
+        <span className="stage-state">{label}</span>
+      </div>
+      <div className="stage-body">{children}</div>
     </li>
   );
 }
 
-function ReplayWindow({
-  windowMs,
-  startedAt,
-  stopAt,
-  endedAt,
-  state,
-  remote,
-}: {
-  windowMs: number;
-  startedAt: number | null;
-  stopAt: number | null;
-  endedAt: number | null;
-  state: StageState;
-  remote: boolean;
-}) {
+function useReplay(
+  windowMs: number,
+  startedAt: number | null,
+  endedAt: number | null,
+  state: StageState,
+) {
   const now = useNow(
     state === "active" && startedAt !== null && endedAt === null,
   );
@@ -643,9 +647,65 @@ function ReplayWindow({
     state === "done"
       ? total
       : Math.min(total, Math.floor(elapsed / CHECKPOINT_MS));
+  return { windowMs, startedAt, endedAt, state, total, elapsed, reached };
+}
+
+type Replay = ReturnType<typeof useReplay>;
+
+// One track circuit per stop-token checkpoint.
+function Checkpoints({ replay }: { replay: Replay }) {
+  const { windowMs, startedAt, state, total, elapsed, reached } = replay;
   const seconds = windowMs / 1000;
   const marks = Array.from({ length: Math.floor(seconds) + 1 }, (_, i) => i);
+  return (
+    <div className="track-bed">
+      <div
+        className="checkpoints"
+        role="progressbar"
+        aria-label="Replay window"
+        aria-valuemin={0}
+        aria-valuemax={windowMs}
+        aria-valuenow={Math.round(elapsed)}
+        aria-valuetext={`${(elapsed / 1000).toFixed(1)} of ${seconds.toFixed(1)} seconds`}
+        style={{ "--checkpoints": total } as CSSProperties}
+      >
+        {Array.from({ length: total }, (_, index) => (
+          <span
+            key={index}
+            className={
+              index < reached
+                ? "ran"
+                : state === "held" && startedAt !== null
+                  ? index === reached
+                    ? "hit"
+                    : "drained"
+                  : state === "active" && index === reached
+                    ? "head"
+                    : ""
+            }
+            style={{ "--i": index - reached } as CSSProperties}
+          />
+        ))}
+      </div>
+      <div className="window-axis" aria-hidden="true">
+        {marks.map((mark) => (
+          <span key={mark}>{mark} s</span>
+        ))}
+      </div>
+    </div>
+  );
+}
 
+function ReplayReadout({
+  replay,
+  stopAt,
+  remote,
+}: {
+  replay: Replay;
+  stopAt: number | null;
+  remote: boolean;
+}) {
+  const { windowMs, startedAt, endedAt, state, elapsed } = replay;
   let caption: ReactNode;
   if (state === "held" && startedAt !== null && endedAt !== null)
     caption =
@@ -674,48 +734,17 @@ function ReplayWindow({
     caption = `Paced so you can stop it. The stop token is checked every ${CHECKPOINT_MS} ms.`;
 
   return (
-    <div className={`replay-window ${state}`}>
-      <div className="window-readout">
+    <>
+      <p className="window-readout">
         <span className="window-elapsed">
           {startedAt === null && state === "held"
             ? "Untimed"
             : `${(elapsed / 1000).toFixed(1)} s`}
         </span>
-        <span>of {seconds.toFixed(1)} s</span>
-      </div>
-      <div
-        className="checkpoints"
-        role="progressbar"
-        aria-label="Replay window"
-        aria-valuemin={0}
-        aria-valuemax={windowMs}
-        aria-valuenow={Math.round(elapsed)}
-        aria-valuetext={`${(elapsed / 1000).toFixed(1)} of ${seconds.toFixed(1)} seconds`}
-        style={{ "--checkpoints": total } as CSSProperties}
-      >
-        {Array.from({ length: total }, (_, index) => (
-          <span
-            key={index}
-            className={
-              index < reached
-                ? "ran"
-                : state === "held" && startedAt !== null
-                  ? index === reached
-                    ? "hit"
-                    : "drained"
-                  : ""
-            }
-            style={{ "--i": index - reached } as CSSProperties}
-          />
-        ))}
-      </div>
-      <div className="window-axis" aria-hidden="true">
-        {marks.map((mark) => (
-          <span key={mark}>{mark} s</span>
-        ))}
-      </div>
-      <p>{caption}</p>
-    </div>
+        <span>of {(windowMs / 1000).toFixed(1)} s</span>
+      </p>
+      <p className="window-caption">{caption}</p>
+    </>
   );
 }
 
@@ -1160,6 +1189,7 @@ function Icon({ name }: { name: IconName }) {
 }
 
 function BrandMark() {
+  // A turnout: the straight road and the diverging road it can be switched to.
   return (
     <svg
       className="brand-mark"
@@ -1167,12 +1197,14 @@ function BrandMark() {
       fill="none"
       aria-hidden="true"
     >
-      <rect width="32" height="32" rx="7" fill="currentColor" />
+      <path d="M3 22h26" stroke="currentColor" strokeWidth="2.5" />
       <path
-        d="M10 6v20M22 6v20M10 11c8 0 4 10 12 10M10 21c8 0 4-10 12-10"
-        stroke="var(--surface)"
-        strokeWidth="2"
+        d="M3 22c9 0 12-12 26-12"
+        stroke="currentColor"
+        strokeWidth="2.5"
+        opacity="0.55"
       />
+      <circle cx="9" cy="22" r="3.5" fill="var(--green)" />
     </svg>
   );
 }
