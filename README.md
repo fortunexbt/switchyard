@@ -1,12 +1,14 @@
 # Switchyard
 
-A policy gate, a stop and a hash-only receipt for the tools an agent calls. The repository has two parts. [`guard/`](guard/) is a Python package with a `@guard.gated(capability, risk)` decorator for your own tool functions. The console is a demo of the same pattern that you can open in a browser.
+Switchyard puts a policy gate, a stop and a hash-only receipt in front of the tools an agent calls. [`guard/`](guard/) is the Python package that does it for your own functions, and the console is a browser demo of the same pattern.
 
-**Live demo: <https://switchyard-phi.vercel.app>**. Press *Replay*, then *Stop* within four seconds.
+![The console after a replay was stopped two seconds in, with its receipt in the ledger](docs/switchyard-console.png)
 
-![Switchyard console with a replay stopped at the fixture stage](docs/switchyard-console.png)
+## Try it
 
-## Gate your own tools
+Open <https://switchyard-phi.vercel.app>, press Replay, then press Stop before the four-second replay window runs out. The run halts at its next 100 ms checkpoint, releases nothing and leaves a receipt in the ledger. The drill it replays, an orbital relay recovery, is invented.
+
+## Gate a tool
 
 ```python
 from switchyard_guard import Guard, Policy
@@ -19,112 +21,35 @@ def read_file(path: str) -> str:
     return open(path).read()
 ```
 
-Calls to ungranted capabilities raise `Denied` before the function runs, `guard.stop()` ends running calls at their next checkpoint or await, and each call writes a receipt with argument and result fingerprints only. Budgets are hard limits checked before the call runs. See [guard/README.md](guard/README.md) for rules over real arguments, budgets, async cancellation, the five guarantees and the property tests that try to break them, the SQLite ledger and three runnable examples.
+A call to a capability you haven't granted raises `Denied` before the function runs. `guard.stop()` ends running calls at their next checkpoint or await, and each call writes a receipt holding fingerprints of its arguments and result, never the values. [guard/README.md](guard/README.md) covers rules, budgets, async tools and the tests behind each guarantee.
 
-## The console
+## Run it locally
 
-Switchyard replays one versioned incident fixture, an orbital relay recovery drill, through a deny-by-default gate. The replay is paced on purpose so you can stop it. A completed run releases the drill's evidence. A stopped run releases nothing except its receipt. Reset needs an explicit acknowledgement and is recorded too.
-
-It is an offline proof, not an assistant with imaginary integrations:
-
-| Capability | Status | Evidence |
-| --- | --- | --- |
-| Deterministic incident replay | Implemented | Versioned JSON fixture and repeatability tests |
-| Deny-by-default policy gate | Implemented | Exact capability/risk allowlist and negative tests |
-| Stop during execution | Implemented | Generation-token invalidation and async concurrency test |
-| Audited stop and reset | Implemented | Separate control routes and receipt rows |
-| Body-free receipt ledger | Implemented | Reduced SQLite schema and byte-level privacy test |
-| Live web, email, files, repos, or messaging | **Not implemented** | No provider or adapter code ships |
-| External write actions | **Denied** | No write capability exists in proof mode |
-
-## How it works
-
-```mermaid
-flowchart LR
-    U[Operator instruction] --> P[Deterministic plan]
-    P --> G{Policy gate}
-    G -->|denied| R[Body-free receipt]
-    G -->|allowed| T[Stop-token checkpoint]
-    T --> X[Embedded fixture executor]
-    X --> T2[Stop-token checkpoint]
-    T2 --> R
-    S[STOP NOW] -->|increments generation| T
-    S -->|increments generation| T2
-    R --> D[(SQLite metadata only)]
-```
-
-Every execution and control mutation enters `ActionGateway`. A stop that latches increments a generation counter, and the executor checks its token against it at every checkpoint, so a run already past the gate is still held. Read-only health, state and receipt endpoints do not create receipts. The optional receipt annotation changes the request fingerprint, not the fixture result.
-
-### The hosted demo
-
-The Vercel build sets `VITE_DEMO_MODE=true`. The console then talks to `frontend/src/lib/engine.ts`, a TypeScript port of the console's gateway, paced executor and receipt ledger, instead of the FastAPI server. Its stop controller and fingerprints come from `frontend/src/lib/guard.ts`, the TypeScript port of `guard/`. Both sides read the same fixture file, and the frontend and backend suites assert the same golden hashes. In this mode the route shows each stage live with browser-clock timings, and the replay window marks the checkpoint where a stop held the run.
-
-Limits of the demo: receipts live in the browser tab and clear on reload, there is no SQLite store, and nothing leaves the page. Run it locally for the full control plane.
-
-## Run locally
-
-Requirements: Python 3.12+, Node.js 24+, and npm 10+.
+You need Python 3.12 or newer, Node 24 and npm 10.
 
 ```bash
 python -m venv .venv
 .venv/bin/python -m pip install -r backend/requirements-dev.txt -e "guard[test]"
-cd frontend && npm ci && cd ..
-```
-
-Start both processes:
-
-```bash
+(cd frontend && npm ci)
 ./scripts/dev.sh
 ```
 
-Open <http://127.0.0.1:5173>. No `.env`, account, token, or network provider is required.
+Then open <http://127.0.0.1:5173>. No account, token or `.env` is needed. `docker compose up --build` runs the same thing on <http://127.0.0.1:3000>, and `cd frontend && VITE_DEMO_MODE=true npm run dev` runs the browser-only demo without Python.
 
-Or use the container profile, which publishes loopback-only ports:
+## What's real
 
-```bash
-docker compose up --build
-```
+Locally, the console talks to a FastAPI backend. Every replay, stop and reset goes through one gateway in [`backend/app/execution.py`](backend/app/execution.py), a stop increments a generation counter that the paced executor checks every 100 ms, and receipts go to SQLite with no instruction text or result body in the schema.
 
-Then open <http://127.0.0.1:3000>.
+The hosted demo has no server. It runs [`frontend/src/lib/engine.ts`](frontend/src/lib/engine.ts), a TypeScript port of that gateway, so its receipts live in the tab and clear on reload. Both sides read the same fixture file and check the same golden hashes.
 
-To run the browser-only demo without Python:
+There are no live integrations. The only executor replays an embedded fixture, no write capability exists, and the server binds to `127.0.0.1` with a loopback-only CORS list, which is a safeguard and not authentication. [SECURITY.md](SECURITY.md) has the threat model and [ARCH.md](ARCH.md) the invariants.
 
-```bash
-cd frontend && npm ci && VITE_DEMO_MODE=true npm run dev
-```
-
-## Verify it
+## Checks
 
 ```bash
 ./scripts/check.sh
 ```
 
-The check runs the guard package tests, the backend suite, Python dependency audit, frontend response-contract tests, typecheck/build/audit, and a high-signal secret scan.
+This runs the guard, backend and frontend test suites, typecheck and build, both dependency audits and a secret scan. CI runs the same jobs on every pull request.
 
-## API surface
-
-| Method | Path | Purpose |
-| --- | --- | --- |
-| `GET` | `/health` | Liveness and honest runtime mode |
-| `GET` | `/api/state` | Stop generation, allowed capabilities, limitations |
-| `GET` | `/api/receipts` | Recent metadata-only receipts |
-| `POST` | `/api/actions` | Route the embedded fixture through the boundary |
-| `POST` | `/api/stop` | Latch stop and invalidate issued tokens |
-| `POST` | `/api/stop/reset` | Explicitly acknowledge and reset stop |
-
-The server binds to `127.0.0.1` by default. CORS is an exact, non-credentialed loopback allowlist. These are safeguards, not authentication; read [SECURITY.md](SECURITY.md) before changing the network boundary.
-
-## Project map
-
-- `guard/`: the `switchyard-guard` package (stop controller, gate, budgets, receipts), its tests, examples and shared goldens
-- `frontend/src/lib/guard.ts`: the TypeScript port of `guard/`
-- `backend/app/execution.py`: the only execution/control mutation boundary
-- `backend/app/policy.py`: compact policy allowlist
-- `backend/app/storage.py`: metadata-only receipt store
-- `backend/app/demo_data/`: versioned deterministic evidence
-- `frontend/`: responsive React dispatch console
-- `ARCH.md`: invariants and extension contract
-- `SECURITY.md`: threat model, mitigations, and known risks
-- `RUN.md`: operator runbook
-
-Licensed under the [MIT License](LICENSE).
+MIT licensed, see [LICENSE](LICENSE).
