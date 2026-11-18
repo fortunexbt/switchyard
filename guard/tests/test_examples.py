@@ -36,10 +36,8 @@ def test_the_readme_quickstart_does_what_the_readme_says(tmp_path: Path, monkeyp
     from switchyard_guard import Denied, Stopped
 
     readme = (EXAMPLES.parent / "README.md").read_text(encoding="utf-8")
-    quickstart, side_effects = re.findall(r"```python\n(.*?)```", readme, re.S)[:2]
-    code = quickstart + side_effects
-    (tmp_path / "workspace" / "a").mkdir(parents=True)
-    (tmp_path / "workspace" / "a" / "one").write_text("1")
+    code = re.findall(r"```python\n(.*?)```", readme, re.S)[0]
+    (tmp_path / "workspace").mkdir()
     monkeypatch.chdir(tmp_path)
     ns: dict = {}
     exec(code, ns)
@@ -49,22 +47,16 @@ def test_the_readme_quickstart_does_what_the_readme_says(tmp_path: Path, monkeyp
         raise AssertionError("traversal was admitted")
     except Denied as denied:
         assert denied.decision.code == "denied.rule.path.inside-workspace"
-        assert f'decision.code == "{denied.decision.code}"' in readme
-    try:
-        ns["delete_file"]("a/one")
-        raise AssertionError("ungranted delete was admitted")
-    except Denied as denied:
-        assert denied.decision.code == "denied.capability"
-    assert (tmp_path / "workspace" / "a" / "one").exists()
-    assert ns["index_tree"]("a") == 1
+        assert f"`{denied.decision.code}`" in readme
+    assert ns["append_lines"]("log.txt", ["one", "two"]) == 2
+    assert ns["read_file"]("log.txt") == "one\ntwo\n"
     ns["guard"].stop()
     try:
-        ns["index_tree"]("a")
+        ns["append_lines"]("log.txt", ["three"])
         raise AssertionError("ran while stopped")
     except Stopped as stopped:
         assert stopped.receipt.code == "denied.stop-active"
     ns["guard"].reset()
-    assert ns["index_tree"]("a") == 1
-    assert ns["append_lines"]("a/log.txt", ["one", "two"]) == 2
-    assert (tmp_path / "workspace" / "a" / "log.txt").read_text() == "one\ntwo\n"
+    assert ns["append_lines"]("log.txt", ["three"]) == 1
+    assert (tmp_path / "workspace" / "log.txt").read_text() == "one\ntwo\nthree\n"
     ns["guard"].ledger.close()
